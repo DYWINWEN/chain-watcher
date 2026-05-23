@@ -80,4 +80,21 @@ describe('engine', () => {
     const alerts = getDb().prepare('SELECT * FROM alerts').all();
     expect(alerts.length).toBe(0);
   });
+
+  it('receiver_repeats_from: suppresses when the repeated SENDER is CEX-blacklisted', async () => {
+    // Scenario: a user address receives 5 inbound USDT txs all from a CEX
+    // hot wallet — this is a normal CEX-withdrawal pattern, not an aggregation
+    // attack. PLAN.md "避免交易所提币被误报" calls for suppression.
+    const cex = '0xcexsender';
+    getDb()
+      .prepare(
+        `INSERT INTO address_lists (list_type, chain, address, label, created_at) VALUES ('cex_blacklist', 'eth', ?, 'test', ?)`,
+      )
+      .run(cex, Math.floor(Date.now() / 1000));
+    for (let i = 0; i < 5; i++) await onNormalizedTx(tx(i, cex, '0xuser', 200));
+    const alerts = getDb()
+      .prepare(`SELECT * FROM alerts WHERE rule = 'receiver_repeats_from'`)
+      .all() as any[];
+    expect(alerts.length).toBe(0); // pattern is CEX-withdrawal, should be suppressed
+  });
 });
