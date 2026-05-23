@@ -1,6 +1,7 @@
 import type { NormalizedTx, RawEvent } from '../types.js';
 import { decodeEvmTransfer } from './erc20.js';
 import { decodeBtcVout } from './btc.js';
+import { decodeTrc20Transfer } from './tron.js';
 import { getLabels } from '../labels/lookup.js';
 
 export async function decode(ev: RawEvent): Promise<NormalizedTx> {
@@ -11,6 +12,8 @@ export async function decode(ev: RawEvent): Promise<NormalizedTx> {
   } else if (ev.kind === 'evm-mempool-tx') {
     base = decodeEvmTransfer({ ...ev, kind: 'evm-transfer', source: undefined });
     base.source = 'mempool';
+  } else if (ev.kind === 'tron-trc20-transfer') {
+    base = await decodeTrc20Transfer(ev);
   } else {
     base = await decodeBtcVout(ev);
     base.source = 'block';

@@ -1,10 +1,11 @@
 import { getSetting, SETTINGS } from '../config.js';
 import type { NormalizedTx, RawEvent } from '../types.js';
 
-function decimalsFor(chain: 'eth' | 'bsc'): number {
-  // Mainnet USDT: ETH = 6, BSC = 18.
+function decimalsFor(chain: 'eth' | 'bsc' | 'polygon'): number {
+  // Mainnet USDT: ETH = 6, BSC = 18, Polygon = 6.
   if (chain === 'eth') return 6;
   if (chain === 'bsc') return 18;
+  if (chain === 'polygon') return 6;
   return 18;
 }
 
@@ -35,7 +36,10 @@ export function decodeEvmTransfer(ev: Extract<RawEvent, { kind: 'evm-transfer' }
   };
 }
 
-export function usdtContractFor(chain: 'eth' | 'bsc'): string {
-  const key = chain === 'eth' ? SETTINGS.chain_eth_usdt : SETTINGS.chain_bsc_usdt;
+export function usdtContractFor(chain: 'eth' | 'bsc' | 'polygon'): string {
+  const key =
+    chain === 'eth' ? SETTINGS.chain_eth_usdt
+    : chain === 'bsc' ? SETTINGS.chain_bsc_usdt
+    : SETTINGS.chain_polygon_usdt;
   return (getSetting<string>(key, '') || '').toLowerCase();
 }
