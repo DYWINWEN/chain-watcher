@@ -1,0 +1,63 @@
+/* chain-watcher design tokens — M11.1 */
+
+:root {
+  /* spacing */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 10px;
+  --sp-4: 14px;
+  --sp-5: 18px;
+  --sp-6: 24px;
+  --sp-7: 28px;
+
+  /* radius */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-pill: 999px;
+
+  /* fonts */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --fs-xl: 22px;
+
+  /* layout constants */
+  --sidebar-w: 220px;
+  --topbar-h: 56px;
+  --drawer-w: 360px;
+
+  /* dark — default */
+  --bg: #0a0a0b;
+  --surface-1: #101015;
+  --surface-2: #16161b;
+  --surface-3: #1b1b3a;
+  --border: #22232a;
+  --text: #fafafa;
+  --text-muted: #a1a1aa;
+  --text-subtle: #71717a;
+
+  /* brand + chain + status (same in both themes) */
+  --accent: #5b6cff;
+  --accent-soft: #a78bfa;
+  --chain-eth: #a78bfa;
+  --chain-bsc: #facc15;
+  --chain-btc: #fb923c;
+  --success: #22c55e;
+  --warning: #facc15;
+  --danger: #f87171;
+}
+
+[data-theme="light"] {
+  --bg: #ffffff;
+  --surface-1: #f4f4f5;
+  --surface-2: #fafafa;
+  --surface-3: #eef0ff;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --text-muted: #52525b;
+  --text-subtle: #71717a;
+}
