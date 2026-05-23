@@ -37,6 +37,29 @@ async function main(): Promise<void> {
   const { seedSubscriptionsIfEmpty } = await import('./notifiers/router.js');
   seedSubscriptionsIfEmpty();
 
+  const { setChannelHandler } = await import('./notifiers/router.js');
+  const { sendToWebhook } = await import('./notifiers/webhook.js');
+  setChannelHandler('webhook', async (alert) => {
+    // Read each subscription's config; one handler per channel, but multiple
+    // subscriptions can target the same channel — so we need the row's config.
+    // The router currently passes only the alert; channel-config lookup goes
+    // through a side query here.
+    const db = (await import('./storage/db.js')).getDb();
+    const rows = db
+      .prepare(`SELECT config FROM subscriptions WHERE channel = 'webhook' AND enabled = 1`)
+      .all() as Array<{ config: string }>;
+    for (const r of rows) {
+      let cfg = {};
+      try { cfg = JSON.parse(r.config); } catch { /* malformed JSON → skip */ }
+      try {
+        await sendToWebhook(alert, cfg);
+      } catch (err) {
+        const { logger } = await import('./utils/logger.js');
+        logger.warn({ err: (err as Error).message }, 'webhook send failed');
+      }
+    }
+  });
+
   startOfacRefresher();
 
   await startDecoderWorker();
