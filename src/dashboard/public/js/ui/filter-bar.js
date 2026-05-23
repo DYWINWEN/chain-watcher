@@ -3,7 +3,7 @@
 
 export function createFilterBar({ onChange } = {}) {
   const state = {
-    chains: new Set(['eth', 'bsc', 'btc']),
+    chains: new Set(['eth', 'bsc', 'btc', 'polygon', 'tron']),
     minUsd: 100,
     timeWindowHours: 24,
     rule: 'any',
@@ -31,6 +31,8 @@ export function createFilterBar({ onChange } = {}) {
   el.appendChild(chainChip('eth'));
   el.appendChild(chainChip('bsc'));
   el.appendChild(chainChip('btc'));
+  el.appendChild(chainChip('polygon'));
+  el.appendChild(chainChip('tron'));
 
   const sep = document.createElement('div');
   sep.style.width = '1px';

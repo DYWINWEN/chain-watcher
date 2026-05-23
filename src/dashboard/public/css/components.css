@@ -130,6 +130,8 @@ code, .mono { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .chip.eth .dot { background: var(--chain-eth); }
 .chip.bsc .dot { background: var(--chain-bsc); }
 .chip.btc .dot { background: var(--chain-btc); }
+.chip.polygon .dot { background: var(--chain-polygon); }
+.chip.tron .dot { background: var(--chain-tron); }
 
 /* primary button */
 .btn {
