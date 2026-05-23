@@ -26,7 +26,7 @@ export async function startDashboard(): Promise<void> {
   // ----- pages -----
   app.use('/static', express.static(join(__dirname, 'public')));
   app.get('/', (_req, res) => res.redirect('/alerts'));
-  app.get(['/alerts', '/watchlist', '/stats', '/settings', '/labels'], (_req, res) => {
+  app.get(['/alerts', '/watchlist', '/stats', '/settings', '/labels', '/rules'], (_req, res) => {
     res.sendFile(join(__dirname, 'public', 'index.html'));
   });
 

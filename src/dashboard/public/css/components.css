@@ -407,3 +407,70 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
   font-family: var(--font-mono);
   font-size: 10px;
 }
+
+/* ===== Rules page (M14) ===== */
+.rule-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.rule-card .header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.rule-card .header .toggle {
+  width: 34px; height: 20px;
+  border-radius: 10px;
+  background: var(--text-subtle);
+  display: inline-block;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.rule-card .header .toggle.on { background: var(--success); }
+.rule-card .header .toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%; background: white;
+  transition: transform 120ms ease;
+}
+.rule-card .header .toggle.on::after { transform: translateX(14px); }
+.rule-card .header .name { font-weight: 600; }
+.rule-card .header .sev-tag {
+  font-size: var(--fs-xs); font-weight: 700; padding: 2px 8px;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.rule-card .header .sev-tag.P1 { background: color-mix(in srgb, var(--danger) 18%, var(--surface-1)); color: var(--danger); }
+.rule-card .header .sev-tag.P2 { background: color-mix(in srgb, var(--warning) 18%, var(--surface-1)); color: var(--warning); }
+.rule-card .header .sev-tag.P3 { background: color-mix(in srgb, var(--text-subtle) 18%, var(--surface-1)); color: var(--text-subtle); }
+.rule-card .header .builtin { font-size: 9px; color: var(--text-subtle); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; text-transform: uppercase; }
+.rule-card pre.dsl {
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  padding: var(--sp-3) var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  overflow-x: auto;
+  margin: 0;
+}
+.rule-card .chips {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+}
+.rule-card .chips .chip-cond {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-pill); padding: 4px 10px; font-size: var(--fs-xs);
+}
+.rule-card .chip-cond.add { border-style: dashed; color: var(--text-subtle); cursor: pointer; }
+.rule-card .footer {
+  display: flex; gap: var(--sp-3); align-items: center;
+  font-size: var(--fs-xs); color: var(--text-subtle);
+}
+.rule-card .footer .edit-link {
+  margin-left: auto; color: var(--accent-soft); cursor: pointer;
+}
