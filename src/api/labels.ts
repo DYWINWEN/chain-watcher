@@ -59,14 +59,55 @@ labelsRouter.delete('/api/labels/:chain/:address/:label', (req, res): void => {
   res.json({ ok: true });
 });
 
-labelsRouter.get('/api/labels/sources', (_req, res) => {
-  const rows = getDb()
+labelsRouter.get('/api/labels/list', (req, res): void => {
+  const chain = String(req.query.chain ?? '').toLowerCase();
+  const search = String(req.query.search ?? '').toLowerCase().trim();
+  const category = String(req.query.category ?? '').toLowerCase();
+  const source = String(req.query.source ?? '');
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 500);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (chain) { where.push('chain = ?'); params.push(chain); }
+  if (category) { where.push('category = ?'); params.push(category); }
+  if (source) { where.push('source = ?'); params.push(source); }
+  if (search) {
+    where.push('(address LIKE ? OR LOWER(label) LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  const db = getDb();
+  const total = (db.prepare(`SELECT COUNT(*) AS n FROM labels ${whereSql}`).get(...params) as { n: number }).n;
+  const rows = db
     .prepare(
-      `SELECT source, last_fetched_at AS lastFetchedAt, row_count AS rowCount, status, last_error AS lastError
+      `SELECT chain, address, label, category, source, risk_score AS riskScore,
+              created_at AS createdAt, updated_at AS updatedAt
+         FROM labels ${whereSql} ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
+    )
+    .all(...params, limit, offset);
+  res.json({ rows, total, limit, offset });
+});
+
+labelsRouter.get('/api/labels/sources', (_req, res) => {
+  const db = getDb();
+  const sources = db
+    .prepare(
+      `SELECT source, last_fetched_at AS lastFetchedAt, status, last_error AS lastError
          FROM label_sources ORDER BY source`,
     )
-    .all();
-  res.json(rows);
+    .all() as Array<{ source: string; lastFetchedAt: number | null; status: string; lastError: string | null }>;
+  const counts = db
+    .prepare(`SELECT source, COUNT(*) AS n FROM labels GROUP BY source`)
+    .all() as Array<{ source: string; n: number }>;
+  const countMap = new Map(counts.map((c) => [c.source, c.n]));
+  res.json(
+    sources.map((s) => ({
+      ...s,
+      rowCount: countMap.get(s.source) ?? 0,
+    })),
+  );
 });
 
 labelsRouter.post('/api/labels/refresh', (req, res): void => {

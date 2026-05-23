@@ -149,17 +149,20 @@ export async function fetchAndImportOfacSdn(url: string): Promise<number> {
   }
 }
 
-function recordSourceFetch(source: Source, rowCount: number, status: 'ok' | 'error', lastError?: string): void {
+function recordSourceFetch(source: Source, _rowCount: number, status: 'ok' | 'error', lastError?: string): void {
+  // NOTE: row_count is no longer persisted here — see API /api/labels/sources
+  // which computes the live count from the labels table itself. We keep the
+  // function signature (with _rowCount unused) so existing call sites stay
+  // unchanged. The schema column is left in place for backward compat.
   const now = Math.floor(Date.now() / 1000);
   getDb()
     .prepare(
       `INSERT INTO label_sources (source, last_fetched_at, row_count, status, last_error)
-         VALUES (?, ?, ?, ?, ?)
+         VALUES (?, ?, 0, ?, ?)
          ON CONFLICT(source) DO UPDATE SET
            last_fetched_at = excluded.last_fetched_at,
-           row_count = excluded.row_count,
            status = excluded.status,
            last_error = excluded.last_error`,
     )
-    .run(source, now, rowCount, status, lastError ?? null);
+    .run(source, now, status, lastError ?? null);
 }
