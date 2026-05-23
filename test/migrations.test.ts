@@ -67,4 +67,18 @@ describe('migrations framework', () => {
     expect(cols.map((c) => c.name)).toContain('pivot_labels');
     expect(cols.map((c) => c.name)).toContain('counterparty_labels');
   });
+
+  it('discovers and applies v1_004_severity_subscriptions.sql', () => {
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT name FROM _migrations WHERE name = 'v1_004_severity_subscriptions.sql'`)
+      .get();
+    expect(row).toBeDefined();
+    const alertCols = db.prepare(`PRAGMA table_info(alerts)`).all() as Array<{ name: string }>;
+    expect(alertCols.map((c) => c.name)).toContain('severity');
+    const subTbl = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'subscriptions'`)
+      .get();
+    expect(subTbl).toBeDefined();
+  });
 });
