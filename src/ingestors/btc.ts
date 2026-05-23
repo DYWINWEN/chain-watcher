@@ -31,9 +31,7 @@ export class BtcIngestor extends Ingestor {
     this.apiBase = getSetting<string>(SETTINGS.chain_btc_api_base, 'https://mempool.space/api');
     const urls = resolveWsUrls('btc');
     if (urls.length === 0) urls.push('wss://mempool.space/api/v1/ws');
-    if (!this.pool || this.pool.size() !== urls.length) {
-      this.pool = new RpcPool(urls);
-    }
+    this.pool = new RpcPool(urls);
     const wsUrl = this.pool.current();
     this.log.info({ wsUrl, poolSize: this.pool.size() }, 'connecting');
 
@@ -66,7 +64,7 @@ export class BtcIngestor extends Ingestor {
         });
       });
     } finally {
-      this.pool.next();
+      if (this.pool) this.pool.next();
     }
   }
 
