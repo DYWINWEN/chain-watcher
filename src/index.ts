@@ -60,6 +60,42 @@ async function main(): Promise<void> {
     }
   });
 
+  const { sendToDiscord } = await import('./notifiers/discord.js');
+  setChannelHandler('discord', async (alert) => {
+    const db = (await import('./storage/db.js')).getDb();
+    const rows = db
+      .prepare(`SELECT config FROM subscriptions WHERE channel = 'discord' AND enabled = 1`)
+      .all() as Array<{ config: string }>;
+    for (const r of rows) {
+      let cfg = {};
+      try { cfg = JSON.parse(r.config); } catch { /* skip */ }
+      try {
+        await sendToDiscord(alert, cfg);
+      } catch (err) {
+        const { logger } = await import('./utils/logger.js');
+        logger.warn({ err: (err as Error).message }, 'discord send failed');
+      }
+    }
+  });
+
+  const { sendToSlack } = await import('./notifiers/slack.js');
+  setChannelHandler('slack', async (alert) => {
+    const db = (await import('./storage/db.js')).getDb();
+    const rows = db
+      .prepare(`SELECT config FROM subscriptions WHERE channel = 'slack' AND enabled = 1`)
+      .all() as Array<{ config: string }>;
+    for (const r of rows) {
+      let cfg = {};
+      try { cfg = JSON.parse(r.config); } catch { /* skip */ }
+      try {
+        await sendToSlack(alert, cfg);
+      } catch (err) {
+        const { logger } = await import('./utils/logger.js');
+        logger.warn({ err: (err as Error).message }, 'slack send failed');
+      }
+    }
+  });
+
   startOfacRefresher();
 
   await startDecoderWorker();
