@@ -22,6 +22,10 @@ async function freshModules() {
   setSetting(SETTINGS.rule_receiver_window, 5, 'test');
   setSetting(SETTINGS.blacklist_cex, true, 'test');
   setSetting(SETTINGS.backfill_enabled, false, 'test');
+  // M14: seed built-in rules so the DSL engine has rules to evaluate
+  const { seedBuiltInRules, reloadRules } = await import('../src/rules/rule-loader.js');
+  seedBuiltInRules();
+  await reloadRules();
 }
 
 function tx(i: number, from: string, to: string, amt = 200) {
@@ -74,8 +78,11 @@ describe('engine', () => {
   });
 
   it('disabling rule prevents alert', async () => {
-    setSetting(SETTINGS.rule_sender_enabled, false, 'test');
-    setSetting(SETTINGS.rule_receiver_enabled, false, 'test');
+    // M14: rules are now driven by the rules table, not settings flags.
+    // Disable both built-in rules in the DB and reload the cache.
+    getDb().prepare(`UPDATE rules SET enabled = 0 WHERE id IN ('sender_repeats_to', 'receiver_repeats_from')`).run();
+    const { reloadRules } = await import('../src/rules/rule-loader.js');
+    await reloadRules();
     for (let i = 0; i < 5; i++) await onNormalizedTx(tx(i, '0xa', '0xb', 200));
     const alerts = getDb().prepare('SELECT * FROM alerts').all();
     expect(alerts.length).toBe(0);

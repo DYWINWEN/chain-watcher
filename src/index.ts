@@ -37,6 +37,10 @@ async function main(): Promise<void> {
   const { seedSubscriptionsIfEmpty } = await import('./notifiers/router.js');
   seedSubscriptionsIfEmpty();
 
+  const { seedBuiltInRules, reloadRules } = await import('./rules/rule-loader.js');
+  seedBuiltInRules();
+  await reloadRules();
+
   const { setChannelHandler } = await import('./notifiers/router.js');
   const { sendToWebhook } = await import('./notifiers/webhook.js');
   setChannelHandler('webhook', async (alert) => {
