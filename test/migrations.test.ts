@@ -81,4 +81,14 @@ describe('migrations framework', () => {
       .get();
     expect(subTbl).toBeDefined();
   });
+
+  it('discovers and applies v1_005_subscriptions_config.sql', () => {
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT name FROM _migrations WHERE name = 'v1_005_subscriptions_config.sql'`)
+      .get();
+    expect(row).toBeDefined();
+    const cols = db.prepare(`PRAGMA table_info(subscriptions)`).all() as Array<{ name: string }>;
+    expect(cols.map((c) => c.name)).toContain('config');
+  });
 });
