@@ -21,6 +21,15 @@ Pages:
 - `/stats` — alert volume by chain (7d) + tx totals
 - `/settings` — every analysis parameter editable; saves take effect immediately
 
+### Environment variables
+
+| Var | Default | Purpose |
+|---|---|---|
+| `DB_PATH` | `./data/cw.db` | SQLite database file location |
+| `LOG_LEVEL` | `info` | pino log level (`fatal` / `error` / `warn` / `info` / `debug` / `trace` / `silent`) |
+| `NODE_ENV` | (unset) | Set to `production` to disable pino-pretty pretty-printing |
+| `REDIS_URL` | `redis://localhost:6379` | BullMQ queue backend |
+
 ## Architecture
 
 ```
