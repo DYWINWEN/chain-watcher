@@ -66,16 +66,24 @@ describe('labels API', () => {
   });
 
   it('GET /api/labels/sources returns status of all configured sources', async () => {
-    // Seed a label_sources row so the response is non-empty
-    getDb()
-      .prepare(
-        `INSERT INTO label_sources (source, last_fetched_at, row_count, status) VALUES (?, ?, ?, ?)`,
-      )
-      .run('ofac_sdn', Math.floor(Date.now() / 1000), 42, 'ok');
+    const db = getDb();
+    // Seed a label_sources row
+    db.prepare(
+      `INSERT INTO label_sources (source, last_fetched_at, row_count, status) VALUES (?, ?, ?, ?)`,
+    ).run('ofac_sdn', Math.floor(Date.now() / 1000), 0, 'ok');
+    // Insert 3 labels for this source so the live COUNT(*) returns 3
+    const now = Math.floor(Date.now() / 1000);
+    for (let i = 0; i < 3; i++) {
+      db.prepare(
+        `INSERT INTO labels (chain, address, label, category, source, risk_score, created_at, updated_at)
+           VALUES ('eth', ?, 'test', 'ofac', 'ofac_sdn', 100, ?, ?)`,
+      ).run(`0xtest${i}`, now, now);
+    }
     const r = await fetch(url('/api/labels/sources'));
     const body = await r.json();
     expect(Array.isArray(body)).toBe(true);
-    expect(body.find((s: any) => s.source === 'ofac_sdn')).toMatchObject({ rowCount: 42, status: 'ok' });
+    // rowCount is now computed live from the labels table, not from the stored column
+    expect(body.find((s: any) => s.source === 'ofac_sdn')).toMatchObject({ rowCount: 3, status: 'ok' });
   });
 
   it('POST /api/labels rejects missing fields', async () => {
