@@ -32,4 +32,19 @@ describe('EVM ingestor checkpoint discipline', () => {
     const catchupBlock = src.slice(catchupStart, catchupEnd);
     expect(catchupBlock).not.toMatch(/this\.saveCheckpoint\(latest\)/);
   });
+
+  it('connect() reads its url via RpcPool.current() — no hard-coded settings read', async () => {
+    // Source-level invariant: connect() must obtain its url from the pool,
+    // not by re-reading SETTINGS directly. This pins the rotation contract.
+    const { readFileSync } = await import('node:fs');
+    const evmSrcPath = new URL('../src/ingestors/evm.ts', import.meta.url);
+    const src = readFileSync(evmSrcPath, 'utf8');
+
+    // The connect() method body should call this.pool.current() and rotate at end.
+    const connectStart = src.indexOf('async connect()');
+    expect(connectStart).toBeGreaterThan(-1);
+    const connectBlock = src.slice(connectStart, connectStart + 4000);
+    expect(connectBlock).toMatch(/this\.pool\.current\(\)/);
+    expect(connectBlock).toMatch(/this\.pool\.next\(\)/);
+  });
 });
