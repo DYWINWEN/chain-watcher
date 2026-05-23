@@ -254,22 +254,32 @@ async function renderSubs(body) {
     body.innerHTML = '<div class="muted">No subscriptions configured.</div>';
     return;
   }
-  body.innerHTML = rows.map((s) => `
-    <div style="display:flex; gap:var(--sp-3); align-items:center; padding:var(--sp-2); border:1px solid var(--border); border-radius:var(--r-sm);">
-      <strong style="min-width:90px;">${s.channel}</strong>
-      <select data-id="${s.id}" data-key="minSeverity">
-        <option ${s.minSeverity === 'P1' ? 'selected' : ''}>P1</option>
-        <option ${s.minSeverity === 'P2' ? 'selected' : ''}>P2</option>
-        <option ${s.minSeverity === 'P3' ? 'selected' : ''}>P3</option>
-      </select>
-      <label style="display:flex; align-items:center; gap:var(--sp-1);">
-        <input type="checkbox" data-id="${s.id}" data-key="enabled" ${s.enabled ? 'checked' : ''} />
-        enabled
-      </label>
-      <span style="flex:1;"></span>
-      <button class="btn ghost" data-del="${s.id}">×</button>
+  body.innerHTML = rows.map((s) => {
+    const isHttp = ['webhook', 'discord', 'slack'].includes(s.channel);
+    return `
+    <div style="display:flex; flex-direction:column; gap:var(--sp-2); padding:var(--sp-3); border:1px solid var(--border); border-radius:var(--r-sm);">
+      <div style="display:flex; gap:var(--sp-3); align-items:center;">
+        <strong style="min-width:90px;">${s.channel}</strong>
+        <select data-id="${s.id}" data-key="minSeverity">
+          <option ${s.minSeverity === 'P1' ? 'selected' : ''}>P1</option>
+          <option ${s.minSeverity === 'P2' ? 'selected' : ''}>P2</option>
+          <option ${s.minSeverity === 'P3' ? 'selected' : ''}>P3</option>
+        </select>
+        <label style="display:flex; align-items:center; gap:var(--sp-1);">
+          <input type="checkbox" data-id="${s.id}" data-key="enabled" ${s.enabled ? 'checked' : ''} />
+          enabled
+        </label>
+        <span style="flex:1;"></span>
+        <button class="btn ghost" data-del="${s.id}">×</button>
+      </div>
+      ${isHttp ? `
+        <div style="display:flex; gap:var(--sp-2); align-items:center;">
+          <span class="muted" style="min-width:90px; font-size:var(--fs-sm);">Config (JSON):</span>
+          <input type="text" data-id="${s.id}" data-key="config" value='${escapeAttr(s.config ?? '{}')}' style="flex:1;" placeholder='{"url":"https://..."} or {"webhookUrl":"https://..."}' />
+        </div>
+      ` : ''}
     </div>
-  `).join('');
+  `; }).join('');
   for (const sel of body.querySelectorAll('select[data-key="minSeverity"]')) {
     sel.addEventListener('change', async () => {
       await apiPatch(`/api/subscriptions/${sel.dataset.id}`, { minSeverity: sel.value });
@@ -288,4 +298,19 @@ async function renderSubs(body) {
       await renderSubs(body);
     });
   }
+  for (const inp of body.querySelectorAll('input[type="text"][data-key="config"]')) {
+    inp.addEventListener('change', async () => {
+      let parsed;
+      try { parsed = JSON.parse(inp.value); } catch {
+        toast({ kind: 'error', message: 'Invalid JSON' });
+        return;
+      }
+      await apiPatch(`/api/subscriptions/${inp.dataset.id}`, { config: parsed });
+      toast({ kind: 'success', message: 'Config saved' });
+    });
+  }
+}
+
+function escapeAttr(s) {
+  return String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
