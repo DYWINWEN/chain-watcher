@@ -62,8 +62,8 @@ function scalarOp(op: string, lhs: unknown, rhs: unknown): boolean {
     case '<': return Number(lhs) < Number(rhs);
     case '>=': return Number(lhs) >= Number(rhs);
     case '<=': return Number(lhs) <= Number(rhs);
-    case '==': return lhs == rhs; // eslint-disable-line eqeqeq
-    case '!=': return lhs != rhs; // eslint-disable-line eqeqeq
+    case '==': return lhs == rhs;  
+    case '!=': return lhs != rhs;  
     case 'in':
       if (!Array.isArray(rhs)) return false;
       return rhs.includes(lhs as never);
