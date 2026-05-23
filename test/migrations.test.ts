@@ -39,4 +39,32 @@ describe('migrations framework', () => {
       .get() as { n: number };
     expect(row.n).toBe(1);
   });
+
+  it('discovers and applies v1_002_labels.sql and v1_003_alert_labels.sql', () => {
+    const db = getDb();
+    const v2 = db
+      .prepare(`SELECT name FROM _migrations WHERE name = 'v1_002_labels.sql'`)
+      .get();
+    const v3 = db
+      .prepare(`SELECT name FROM _migrations WHERE name = 'v1_003_alert_labels.sql'`)
+      .get();
+    expect(v2).toBeDefined();
+    expect(v3).toBeDefined();
+
+    // labels table + indexes
+    const labelTbl = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'labels'`)
+      .get();
+    expect(labelTbl).toBeDefined();
+    const indexes = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'labels'`)
+      .all() as Array<{ name: string }>;
+    expect(indexes.map((i) => i.name)).toContain('idx_labels_addr');
+    expect(indexes.map((i) => i.name)).toContain('idx_labels_cat');
+
+    // alerts label columns
+    const cols = db.prepare(`PRAGMA table_info(alerts)`).all() as Array<{ name: string }>;
+    expect(cols.map((c) => c.name)).toContain('pivot_labels');
+    expect(cols.map((c) => c.name)).toContain('counterparty_labels');
+  });
 });
