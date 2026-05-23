@@ -1,5 +1,6 @@
 import { Worker } from 'bullmq';
 import { connection, RAW_TX_QUEUE, normalizedTxQueue } from '../queues/index.js';
+import { safeJobId } from '../queues/job-id.js';
 import { decode } from '../decoder/index.js';
 import { getSetting, SETTINGS } from '../config.js';
 import { logger } from '../utils/logger.js';
@@ -14,7 +15,7 @@ export async function startDecoderWorker(): Promise<void> {
     RAW_TX_QUEUE,
     async (job) => {
       const tx = await decode(job.data);
-      await normalizedTxQueue.add('norm', tx, { jobId: `${tx.chain}:${tx.txHash}` });
+      await normalizedTxQueue.add('norm', tx, { jobId: safeJobId(tx.chain, tx.txHash) });
     },
     { connection, concurrency },
   );
