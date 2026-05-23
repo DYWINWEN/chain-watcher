@@ -9,7 +9,7 @@ export default [
     ignores: ['dist/**', 'node_modules/**', 'src/dashboard/public/**'],
   },
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.ts', 'test/**/*.ts', 'scripts/**/*.ts'],
     languageOptions: {
       parser: tsparser,
       ecmaVersion: 2022,

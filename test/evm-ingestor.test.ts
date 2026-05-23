@@ -7,12 +7,10 @@ import { join } from 'node:path';
 // invariant that `connect()` does NOT advance the checkpoint
 // for blocks whose logs haven't been processed.
 
-let getDb: typeof import('../src/storage/db.js').getDb;
-
 beforeEach(async () => {
   vi.resetModules();
   process.env.DB_PATH = join(mkdtempSync(join(tmpdir(), 'cw-evm-')), 'cw.db');
-  ({ getDb } = await import('../src/storage/db.js'));
+  await import('../src/storage/db.js');
 });
 
 describe('EVM ingestor checkpoint discipline', () => {

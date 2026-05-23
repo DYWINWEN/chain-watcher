@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { btcTxToRawEvents, decodeBtcVout, type BtcTx } from '../src/decoder/btc.js';
 import { __setPriceFetcher, clearPriceCache } from '../src/decoder/price-oracle.js';
 
