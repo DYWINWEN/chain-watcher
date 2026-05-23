@@ -9,6 +9,7 @@ import { logger } from '../utils/logger.js';
 import { labelsRouter } from '../api/labels.js';
 import { subscriptionsRouter } from '../api/subscriptions.js';
 import { rulesRouter } from '../api/rules.js';
+import { graphRouter } from '../api/graph.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -22,6 +23,7 @@ export async function startDashboard(): Promise<void> {
   app.use(labelsRouter);
   app.use(subscriptionsRouter);
   app.use(rulesRouter);
+  app.use(graphRouter);
 
   // ----- pages -----
   app.use('/static', express.static(join(__dirname, 'public')));
