@@ -8,6 +8,29 @@ import { createFilterBar, matchesFilter } from '../ui/filter-bar.js';
 import { fmtRelative, shortHash, fmtUsd } from '../format.js';
 
 const CHAIN_LABEL = { eth: 'Ethereum', bsc: 'BSC', btc: 'Bitcoin' };
+
+function labelsChipsHtml(raw) {
+  if (!raw) return '';
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try { parsed = JSON.parse(raw); } catch { return ''; }
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return '';
+  return parsed
+    .slice(0, 2) // cap at 2 chips per side for layout
+    .map((l) => `<span class="tag ${categoryClass(l.category)}">${escapeHtml(l.label)}</span>`)
+    .join('');
+}
+
+function categoryClass(c) {
+  if (c === 'ofac' || c === 'sanctions' || c === 'mixer') return 'ofac';
+  if (c === 'cex' || c === 'bridge' || c === 'project') return 'cex';
+  return 'mixer'; // user
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 const RULE_LABEL = {
   sender_repeats_to: 'Sender repeats to same address',
   receiver_repeats_from: 'Receiver gathers from same address',
@@ -85,8 +108,10 @@ function alertCard(a) {
     </div>
     <div style="display:flex;align-items:center;gap:var(--sp-3); margin-top:var(--sp-3);">
       <code class="mono" data-addr="${pivot}">${shortHash(pivot)}</code>
+      ${labelsChipsHtml(a.pivot_labels ?? a.pivotLabels)}
       <span class="subtle">→</span>
       <code class="mono" data-addr="${counterparty}">${shortHash(counterparty)}</code>
+      ${labelsChipsHtml(a.counterparty_labels ?? a.counterpartyLabels)}
       <span style="flex:1;"></span>
       <span class="muted" style="font-size:var(--fs-sm);">View detail →</span>
     </div>
