@@ -2,12 +2,13 @@ import WebSocket from 'ws';
 import { Ingestor } from './base.js';
 import { getSetting, SETTINGS } from '../config.js';
 import { bus, EVENTS, type ConfigChangedPayload } from '../utils/event-bus.js';
+import { RpcPool, resolveWsUrls } from '../utils/rpc-pool.js';
 import { btcTxToRawEvents, type BtcTx } from '../decoder/btc.js';
 
 export class BtcIngestor extends Ingestor {
   private ws: WebSocket | null = null;
   private apiBase = '';
-  private wsUrl = '';
+  private pool: RpcPool | null = null;
   private readonly configListener = (payload: ConfigChangedPayload) => {
     if (typeof payload.key !== 'string') return;
     if (!payload.key.startsWith('chain.btc.')) return;
@@ -28,36 +29,45 @@ export class BtcIngestor extends Ingestor {
   async connect(): Promise<void> {
     if (this.stopped) return;
     this.apiBase = getSetting<string>(SETTINGS.chain_btc_api_base, 'https://mempool.space/api');
-    this.wsUrl = getSetting<string>(SETTINGS.chain_btc_ws_url, 'wss://mempool.space/api/v1/ws');
-    this.log.info({ wsUrl: this.wsUrl }, 'connecting');
+    const urls = resolveWsUrls('btc');
+    if (urls.length === 0) urls.push('wss://mempool.space/api/v1/ws');
+    if (!this.pool || this.pool.size() !== urls.length) {
+      this.pool = new RpcPool(urls);
+    }
+    const wsUrl = this.pool.current();
+    this.log.info({ wsUrl, poolSize: this.pool.size() }, 'connecting');
 
-    const ws = new WebSocket(this.wsUrl);
-    this.ws = ws;
+    try {
+      const ws = new WebSocket(wsUrl);
+      this.ws = ws;
 
-    const opened = new Promise<void>((resolve, reject) => {
-      ws.once('open', () => resolve());
-      ws.once('error', (err) => reject(err));
-    });
-    await opened;
-
-    ws.send(JSON.stringify({ action: 'want', data: ['blocks'] }));
-
-    ws.on('message', (raw) => {
-      void this.handleMessage(raw.toString()).catch((err) =>
-        this.log.warn({ err: (err as Error).message }, 'btc msg handler error'),
-      );
-    });
-
-    await new Promise<void>((resolve) => {
-      ws.once('close', () => {
-        this.log.warn('btc ws closed');
-        resolve();
+      const opened = new Promise<void>((resolve, reject) => {
+        ws.once('open', () => resolve());
+        ws.once('error', (err) => reject(err));
       });
-      ws.once('error', (err) => {
-        this.log.warn({ err: err.message }, 'btc ws error');
-        resolve();
+      await opened;
+
+      ws.send(JSON.stringify({ action: 'want', data: ['blocks'] }));
+
+      ws.on('message', (raw) => {
+        void this.handleMessage(raw.toString()).catch((err) =>
+          this.log.warn({ err: (err as Error).message }, 'btc msg handler error'),
+        );
       });
-    });
+
+      await new Promise<void>((resolve) => {
+        ws.once('close', () => {
+          this.log.warn('btc ws closed');
+          resolve();
+        });
+        ws.once('error', (err) => {
+          this.log.warn({ err: err.message }, 'btc ws error');
+          resolve();
+        });
+      });
+    } finally {
+      this.pool.next();
+    }
   }
 
   async disconnect(): Promise<void> {
