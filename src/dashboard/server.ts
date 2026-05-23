@@ -61,6 +61,63 @@ export async function startDashboard(): Promise<void> {
     );
   });
 
+  app.get('/api/address/:chain/:address', (req, res): void => {
+    const chain = String(req.params.chain).toLowerCase();
+    const address = String(req.params.address).toLowerCase();
+    const db = getDb();
+
+    const out = db
+      .prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(amount_usdt), 0) AS total FROM tx WHERE chain = ? AND from_addr = ?`)
+      .get(chain, address) as { n: number; total: number };
+    const into = db
+      .prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(amount_usdt), 0) AS total FROM tx WHERE chain = ? AND to_addr = ?`)
+      .get(chain, address) as { n: number; total: number };
+    const alerts = db
+      .prepare(`SELECT COUNT(*) AS n FROM alerts WHERE chain = ? AND (pivot_address = ? OR counterparty = ?)`)
+      .get(chain, address, address) as { n: number };
+    const labels = db
+      .prepare(
+        `SELECT label, category, risk_score AS riskScore, source FROM labels WHERE chain = ? AND address = ?`,
+      )
+      .all(chain, address) as Array<{ label: string; category: string; riskScore: number; source: string }>;
+    const maxRisk = labels.reduce((m, l) => Math.max(m, l.riskScore), 0);
+
+    // Top counterparties — from windows table (in + out merged).
+    const tops = db
+      .prepare(
+        `SELECT counterparties FROM windows WHERE chain = ? AND address = ?`,
+      )
+      .all(chain, address) as Array<{ counterparties: string }>;
+    const counterCount = new Map<string, number>();
+    for (const row of tops) {
+      try {
+        const cps = JSON.parse(row.counterparties) as string[];
+        for (const cp of cps) counterCount.set(cp, (counterCount.get(cp) ?? 0) + 1);
+      } catch {
+        // ignore malformed JSON
+      }
+    }
+    const topCounterparties = [...counterCount.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([address, count]) => ({ address, count }));
+
+    res.json({
+      chain,
+      address,
+      stats: {
+        outboundCount: out.n,
+        outboundTotal: out.total,
+        inboundCount: into.n,
+        inboundTotal: into.total,
+        alertCount: alerts.n,
+        maxRiskScore: maxRisk,
+      },
+      labels,
+      topCounterparties,
+    });
+  });
+
   app.get('/api/stats', (_req, res) => {
     const buckets = getDb()
       .prepare(
