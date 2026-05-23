@@ -7,6 +7,8 @@ import { pushAndCheck } from './window-store.js';
 import { isCexBlacklisted, isUserWhitelisted } from './blacklist.js';
 import { scheduleBackfill } from './backfill.js';
 import { getLabels } from '../labels/lookup.js';
+import { assignSeverity } from '../notifiers/severity.js';
+import { routeAlert } from '../notifiers/router.js';
 
 function currentConfig() {
   return {
@@ -59,17 +61,18 @@ function recordAlert(
   const cpFull = getLabels(tx.chain, counterparty).map((l) => ({
     label: l.label, category: l.category, riskScore: l.riskScore,
   }));
+  const sev = assignSeverity({ amountUsdt: tx.amountUsdt, pivotLabels: pivotFull, counterpartyLabels: cpFull });
   const res = db
     .prepare(
       `INSERT INTO alerts (chain, rule, pivot_address, counterparty, trigger_tx_hash,
                            window_tx_hashes, amount_usdt, created_at,
-                           pivot_labels, counterparty_labels)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                           pivot_labels, counterparty_labels, severity)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       tx.chain, rule, pivot, counterparty, tx.txHash,
       JSON.stringify(windowTxHashes), tx.amountUsdt, now,
-      JSON.stringify(pivotFull), JSON.stringify(cpFull),
+      JSON.stringify(pivotFull), JSON.stringify(cpFull), sev,
     );
   const payload: AlertNewPayload = {
     id: Number(res.lastInsertRowid),
@@ -81,10 +84,12 @@ function recordAlert(
     windowTxHashes,
     amountUsdt: tx.amountUsdt,
     createdAt: now,
+    severity: sev,
     pivotLabels: pivotFull,
     counterpartyLabels: cpFull,
   };
   bus.emit(EVENTS.AlertNew, payload);
+  void routeAlert(payload);
   return payload;
 }
 
