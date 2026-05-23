@@ -3,6 +3,7 @@ import { logger, type Logger } from '../utils/logger.js';
 import { bus, EVENTS } from '../utils/event-bus.js';
 import { exponentialBackoff, sleep } from '../utils/reconnect.js';
 import { rawTxQueue } from '../queues/index.js';
+import { safeJobId } from '../queues/job-id.js';
 import type { Chain, RawEvent } from '../types.js';
 
 export abstract class Ingestor {
@@ -51,7 +52,10 @@ export abstract class Ingestor {
 
   protected async enqueue(ev: RawEvent): Promise<void> {
     try {
-      await rawTxQueue.add('raw', ev, { jobId: `${ev.chain}:${ev.txHash}` });
+      // Include the sub-event index (logIndex for EVM, voutIndex for BTC) so
+      // multiple events from the same tx aren't deduplicated by jobId.
+      const subIndex = ev.kind === 'evm-transfer' ? ev.logIndex : ev.voutIndex;
+      await rawTxQueue.add('raw', ev, { jobId: safeJobId(ev.chain, ev.txHash, subIndex) });
     } catch (err) {
       this.log.warn({ err: (err as Error).message }, 'enqueue failed');
     }
