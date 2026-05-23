@@ -49,6 +49,15 @@ export async function renderSettings(root) {
   await renderAudit(auditSection.querySelector('#audit-body'));
 
   onSse('config', () => void renderAudit(auditSection.querySelector('#audit-body')));
+
+  // M10: label sources card
+  const sourcesCard = document.createElement('div');
+  sourcesCard.className = 'card';
+  sourcesCard.style.marginTop = 'var(--sp-4)';
+  sourcesCard.innerHTML = `<h2 style="font-size:var(--fs-md); margin:0 0 var(--sp-3); color:var(--accent-soft);">Label sources</h2>
+    <div id="sources-body" style="display:flex; flex-direction:column; gap:var(--sp-3);"></div>`;
+  root.appendChild(sourcesCard);
+  await renderLabelSources(sourcesCard.querySelector('#sources-body'));
 }
 
 function settingRow(key, currentValue) {
@@ -170,4 +179,36 @@ async function renderAudit(body) {
        <span style="flex:1;">${r.key} = ${r.new_value}</span>
      </div>`
   ).join('');
+}
+
+async function renderLabelSources(body) {
+  const sources = await apiGet('/api/labels/sources');
+  if (!sources.length) {
+    body.innerHTML = `<div class="muted">No labels imported yet.</div>`;
+    return;
+  }
+  body.innerHTML = sources.map((s) => `
+    <div style="display:flex; align-items:center; gap:var(--sp-3);">
+      <strong style="min-width:140px;">${s.source}</strong>
+      <span class="muted">${s.rowCount.toLocaleString()} rows</span>
+      <span class="muted">·</span>
+      <span class="muted">${s.lastFetchedAt ? fmtTime(s.lastFetchedAt) : 'never'}</span>
+      <span style="flex:1;"></span>
+      <span class="tag ${s.status === 'ok' ? 'cex' : 'ofac'}" data-status="${s.status}">${s.status.toUpperCase()}</span>
+      ${s.source === 'ofac_sdn' ? `<button class="btn ghost" data-refresh="${s.source}">Refresh now</button>` : ''}
+    </div>
+  `).join('');
+
+  for (const btn of body.querySelectorAll('[data-refresh]')) {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Refreshing…';
+      try {
+        await apiPost('/api/labels/refresh', { source: btn.dataset.refresh });
+        toast({ kind: 'success', message: 'OFAC refresh started — check status in a moment' });
+      } catch { /* api.js already toasted */ }
+      // Re-render after a short delay so the status reflects.
+      setTimeout(() => void renderLabelSources(body), 1500);
+    });
+  }
 }
