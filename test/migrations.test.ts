@@ -105,4 +105,24 @@ describe('migrations framework', () => {
     const alertCols = db.prepare(`PRAGMA table_info(alerts)`).all() as Array<{ name: string }>;
     expect(alertCols.map((c) => c.name)).toContain('rule_id');
   });
+
+  it('discovers and applies v1_007_mempool.sql', () => {
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT name FROM _migrations WHERE name = 'v1_007_mempool.sql'`)
+      .get();
+    expect(row).toBeDefined();
+    const alertCols = db.prepare(`PRAGMA table_info(alerts)`).all() as Array<{ name: string }>;
+    expect(alertCols.map((c) => c.name)).toContain('status');
+    expect(alertCols.map((c) => c.name)).toContain('confirmed_block');
+    expect(alertCols.map((c) => c.name)).toContain('source');
+    const mempoolTbl = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'mempool_pending'`)
+      .get();
+    expect(mempoolTbl).toBeDefined();
+    const actionsTbl = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'alert_actions'`)
+      .get();
+    expect(actionsTbl).toBeDefined();
+  });
 });

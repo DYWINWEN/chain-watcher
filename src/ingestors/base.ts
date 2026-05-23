@@ -54,7 +54,7 @@ export abstract class Ingestor {
     try {
       // Include the sub-event index (logIndex for EVM, voutIndex for BTC) so
       // multiple events from the same tx aren't deduplicated by jobId.
-      const subIndex = ev.kind === 'evm-transfer' ? ev.logIndex : ev.voutIndex;
+      const subIndex = ev.kind === 'evm-transfer' || ev.kind === 'evm-mempool-tx' ? ev.logIndex : ev.voutIndex;
       await rawTxQueue.add('raw', ev, { jobId: safeJobId(ev.chain, ev.txHash, subIndex) });
     } catch (err) {
       this.log.warn({ err: (err as Error).message }, 'enqueue failed');
