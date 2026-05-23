@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { join } from 'node:path';
 import { logger } from './utils/logger.js';
 import { getDb, closeDb } from './storage/db.js';
 import { loadSeedConfig, seedSettingsIfEmpty, seedCexBlacklistIfEmpty, getSetting, SETTINGS } from './config.js';
@@ -6,6 +7,8 @@ import { startIngestors, stopIngestors } from './ingestors/index.js';
 import { startDecoderWorker, startRuleWorker, stopWorkers } from './workers/index.js';
 import { startDashboard, stopDashboard } from './dashboard/server.js';
 import { startTelegramNotifier, stopTelegramNotifier } from './notifiers/telegram.js';
+import { seedEtherscanLabels } from './labels/importer.js';
+import { startOfacRefresher } from './labels/refresher.js';
 
 async function main(): Promise<void> {
   getDb();
@@ -25,6 +28,13 @@ async function main(): Promise<void> {
     'chain-watcher up',
   );
 
+  // M10: labels — seed the vendored etherscan-labels snapshot (no-op if already seeded)
+  // and kick off the OFAC SDN refresher (stale-on-boot + 24h interval).
+  const seedDir = join(process.cwd(), 'config', 'labels-seed');
+  seedEtherscanLabels('eth', join(seedDir, 'eth.json'));
+  seedEtherscanLabels('bsc', join(seedDir, 'bsc.json'));
+  startOfacRefresher();
+
   await startDecoderWorker();
   await startRuleWorker();
   await startIngestors();
@@ -34,6 +44,8 @@ async function main(): Promise<void> {
   const shutdown = async (sig: string) => {
     logger.warn({ sig }, 'shutting down');
     await Promise.allSettled([stopIngestors(), stopWorkers(), stopDashboard(), stopTelegramNotifier()]);
+    const { stopOfacRefresher } = await import('./labels/refresher.js');
+    stopOfacRefresher();
     closeDb();
     process.exit(0);
   };
