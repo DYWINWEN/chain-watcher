@@ -91,4 +91,18 @@ describe('migrations framework', () => {
     const cols = db.prepare(`PRAGMA table_info(subscriptions)`).all() as Array<{ name: string }>;
     expect(cols.map((c) => c.name)).toContain('config');
   });
+
+  it('discovers and applies v1_006_rules.sql', () => {
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT name FROM _migrations WHERE name = 'v1_006_rules.sql'`)
+      .get();
+    expect(row).toBeDefined();
+    const rulesTbl = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rules'`)
+      .get();
+    expect(rulesTbl).toBeDefined();
+    const alertCols = db.prepare(`PRAGMA table_info(alerts)`).all() as Array<{ name: string }>;
+    expect(alertCols.map((c) => c.name)).toContain('rule_id');
+  });
 });
