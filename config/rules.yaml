@@ -1,0 +1,52 @@
+# chain-watcher seed config (first launch only — runtime values live in SQLite `settings`).
+threshold_usdt: 100
+
+rules:
+  sender_repeats_to:
+    enabled: true
+    window_size: 5
+  receiver_repeats_from:
+    enabled: true
+    window_size: 5
+
+blacklist_cex: true
+
+chains:
+  eth:
+    enabled: true
+    ws_url: ${ETH_WS_URL}
+    usdt_contract: '0xdAC17F958D2ee523a2206206994597C13D831ec7'
+    decimals: 6
+  bsc:
+    enabled: true
+    ws_url: ${BSC_WS_URL}
+    usdt_contract: '0x55d398326f99059fF775485246999027B3197955'
+    decimals: 18
+  btc:
+    enabled: true
+    api_base: 'https://mempool.space/api'
+    ws_url: 'wss://mempool.space/api/v1/ws'
+
+price_oracle:
+  ttl_seconds: 60
+  symbols:
+    BTC: BTCUSDT
+
+notifiers:
+  dashboard:
+    enabled: true
+    port: 8787
+  telegram:
+    enabled: false
+    bot_token: ${TG_BOT_TOKEN}
+    chat_id: ${TG_CHAT_ID}
+    min_level: info
+
+backfill:
+  enabled: true
+  concurrency: 2
+  history_window: 5
+
+workers:
+  decoder_concurrency: 8
+  rule_concurrency: 4
