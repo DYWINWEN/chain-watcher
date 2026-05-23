@@ -85,7 +85,13 @@ async function backfillEvm(
       return [];
     }
     const latest = await provider.getBlockNumber();
-    const lookback = 60_000; // ~ a week on ETH; bounded so eth_getLogs doesn't blow up.
+    // Keep under common public-RPC caps: PublicNode allows up to 50k blocks
+    // per eth_getLogs call; Ankr / drpc.org sit around the same range. 9,900 gives
+    // a comfortable safety margin (~1.5 days on ETH at 12s blocks; ~8h on BSC at 3s).
+    // For an active address this is enough to find 5 historical transfers; if the
+    // address is dormant the window stays unfilled, which is acceptable — operators
+    // with paid RPC can lift this in M10/M14 once the setting is exposed.
+    const lookback = 9_900;
     const fromBlock = Math.max(0, latest - lookback);
     const padded = ethers.zeroPadValue(address, 32);
     const topics: Array<string | null> =
