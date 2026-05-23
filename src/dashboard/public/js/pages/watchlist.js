@@ -1,5 +1,7 @@
 import { apiGet } from '../api.js';
 import { fmtTime, shortHash, fmtUsd } from '../format.js';
+import { renderGraph } from '../ui/graph.js';
+import { openDrawer, closeDrawer } from '../ui/drawer.js';
 
 export async function renderWatchlist(root) {
   root.innerHTML = `
@@ -29,6 +31,7 @@ export async function renderWatchlist(root) {
       data = await apiGet(`/api/address/${chain}/${encodeURIComponent(addr)}`);
     } catch { return; }
     renderDetail(data, addr, chain);
+    loadGraph(out, addr, chain);
   };
 
   root.querySelector('#wl-go').addEventListener('click', lookup);
@@ -64,31 +67,79 @@ export async function renderWatchlist(root) {
       </div>
 
       <div class="card" style="margin-top:var(--sp-3);">
-        <strong>Top counterparties (last 5 outbound + last 5 inbound merged)</strong>
-        ${data.topCounterparties.length
-          ? `<table style="width:100%; margin-top:var(--sp-3); font-size:var(--fs-sm);">
-              <thead><tr>
-                <th style="text-align:left; color:var(--text-muted); font-weight:500;">#</th>
-                <th style="text-align:left; color:var(--text-muted); font-weight:500;">Address</th>
-                <th style="text-align:left; color:var(--text-muted); font-weight:500;">Tx count</th>
-              </tr></thead>
-              <tbody>
-                ${data.topCounterparties.map((c, i) => `
-                  <tr style="border-top:1px solid var(--border);">
-                    <td class="muted" style="padding:var(--sp-2);">${i + 1}</td>
-                    <td style="padding:var(--sp-2);"><code class="mono">${c.address.length > 14 ? shortHash(c.address) : c.address}</code></td>
-                    <td style="padding:var(--sp-2);">${c.count}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>`
-          : '<div class="muted" style="margin-top:var(--sp-3);">No counterparties yet — window not populated.</div>'}
-      </div>
+          <div style="display:flex; align-items:center; gap:var(--sp-3);">
+            <strong>Counterparty graph</strong>
+            <span class="muted" style="font-size:var(--fs-sm);">click a node to drill in · dbl-click to expand 1 level</span>
+          </div>
+          <div id="wl-graph" style="height: 420px; margin-top:var(--sp-3); background:var(--surface-2); border-radius:var(--r-md);"></div>
+        </div>
 
       <div id="wl-windows" style="margin-top:var(--sp-3);"></div>
     `;
 
     void renderWindows(out.querySelector('#wl-windows'), addr);
+  }
+
+  async function loadGraph(container, address, chain) {
+    const host = container.querySelector('#wl-graph');
+    if (!host) return;
+    host.innerHTML = '<div class="muted" style="padding:var(--sp-5); text-align:center;">Loading graph…</div>';
+    let data;
+    try {
+      data = await apiGet(`/api/graph?chain=${chain}&address=${encodeURIComponent(address)}&depth=1&limit=10`);
+    } catch { return; }
+    if (data.nodes.length <= 1) {
+      host.innerHTML = '<div class="muted" style="padding:var(--sp-5); text-align:center;">No counterparties yet.</div>';
+      return;
+    }
+    let mergedData = data;
+    const draw = () => renderGraph(host, mergedData, {
+      onNodeClick: (n) => openNodeDrawer(n),
+      onNodeDblClick: async (n) => {
+        if (n.isLeaf || n.isPivot) return;
+        try {
+          const extra = await apiGet(`/api/graph?chain=${n.chain}&address=${encodeURIComponent(n.address)}&depth=1&limit=10`);
+          mergedData = {
+            pivot: mergedData.pivot,
+            nodes: [...new Map([...mergedData.nodes, ...extra.nodes].map((x) => [x.id, x])).values()],
+            edges: [...new Map([...mergedData.edges, ...extra.edges].map((x) => [`${x.source}->${x.target}`, x])).values()],
+          };
+          draw();
+        } catch { /* toasted */ }
+      },
+    });
+    draw();
+  }
+
+  function openNodeDrawer(n) {
+    const body = document.createElement('div');
+    body.innerHTML = `
+      <div style="display:flex; flex-direction:column; gap:var(--sp-3);">
+        <div>
+          <div class="muted" style="font-size:var(--fs-xs);">Address</div>
+          <code class="mono" style="font-size:var(--fs-md); word-break: break-all;">${n.address}</code>
+        </div>
+        <div>
+          <div class="muted" style="font-size:var(--fs-xs);">Chain · Risk</div>
+          <div><strong style="color:var(--chain-${n.chain});">${n.chain.toUpperCase()}</strong> · risk ${n.riskScore}/100</div>
+        </div>
+        ${n.labels.length > 0 ? `
+          <div>
+            <div class="muted" style="font-size:var(--fs-xs);">Labels</div>
+            <div style="display:flex; flex-wrap:wrap; gap:4px;">
+              ${n.labels.map((l) => `<span class="tag ${n.category === 'ofac' || n.category === 'mixer' ? 'ofac' : 'cex'}">${escapeHtml(l)}</span>`).join('')}
+            </div>
+          </div>` : ''}
+        <a class="btn" href="/watchlist?address=${encodeURIComponent(n.address)}">Open in Watchlist</a>
+        <button class="btn ghost" id="close-drawer">Close</button>
+      </div>
+    `;
+    body.querySelector('#close-drawer').addEventListener('click', closeDrawer);
+    openDrawer({ title: 'Address', body });
+  }
+
+  function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
   async function renderWindows(host, addr) {
