@@ -7,6 +7,7 @@ export const EVENTS = {
   TxNormalized: 'tx:normalized',
   IngestorDown: 'ingestor:down',
   LabelsChanged: 'labels:changed',
+  RuleChanged: 'rule:changed',
 } as const;
 
 export type ConfigChangedPayload = { key: string; value: unknown };
@@ -25,6 +26,7 @@ export type AlertNewPayload = {
   counterpartyLabels: Array<{ label: string; category: string; riskScore: number }>;
 };
 export type LabelsChangedPayload = { chain: Chain; address: string };
+export type RuleChangedPayload = { id: string };
 
 class TypedBus extends EventEmitter {}
 
