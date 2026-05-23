@@ -87,7 +87,10 @@ export class EvmIngestor extends Ingestor {
         const start = Math.max(fromCheckpoint + 1, latest - 5_000); // cap replay window
         await this.replayRange(start, latest);
       }
-      this.saveCheckpoint(latest);
+      // NOTE: do NOT saveCheckpoint(latest) here — there is a window between
+      // this line and the `provider.on(filter, ...)` attachment below in which
+      // new blocks could arrive and be dropped. handleLog() advances the
+      // checkpoint per processed log, which is the correct authoritative source.
     } catch (err) {
       throw wsErrored ?? err;
     }
