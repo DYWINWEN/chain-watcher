@@ -176,6 +176,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .tag.ofac { background: color-mix(in srgb, var(--danger) 18%, var(--surface-1)); color: var(--danger); }
 .tag.cex { background: color-mix(in srgb, var(--success) 18%, var(--surface-1)); color: var(--success); }
 .tag.mixer { background: color-mix(in srgb, var(--warning) 18%, var(--surface-1)); color: var(--warning); }
+.tag.pending { background: color-mix(in srgb, var(--text-subtle) 18%, var(--surface-1)); color: var(--text-muted); }
 
 /* utility */
 .muted { color: var(--text-muted); }
