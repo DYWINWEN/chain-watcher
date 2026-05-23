@@ -1,4 +1,4 @@
-export type Chain = 'eth' | 'bsc' | 'btc';
+export type Chain = 'eth' | 'bsc' | 'btc' | 'polygon' | 'tron';
 export type Token = 'USDT' | 'BTC';
 export type Direction = 'in' | 'out';
 
@@ -21,7 +21,7 @@ export type NormalizedTx = {
 export type RawEvent =
   | {
       kind: 'evm-transfer';
-      chain: 'eth' | 'bsc';
+      chain: 'eth' | 'bsc' | 'polygon';
       txHash: string;
       logIndex: number;
       blockNumber: number;
@@ -33,7 +33,7 @@ export type RawEvent =
     }
   | {
       kind: 'evm-mempool-tx';
-      chain: 'eth' | 'bsc';
+      chain: 'eth' | 'bsc' | 'polygon';
       txHash: string;
       logIndex: number;
       blockNumber: number;
@@ -53,6 +53,17 @@ export type RawEvent =
       from: string;
       to: string;
       sats: string;
+    }
+  | {
+      kind: 'tron-trc20-transfer';
+      chain: 'tron';
+      txHash: string;        // 64-hex from TronGrid (no 0x prefix from upstream; we normalize)
+      blockNumber: number;
+      timestamp: number;
+      from: string;          // Base58 address (case-sensitive — DO NOT lowercase)
+      to: string;
+      valueRaw: string;      // uint256 string in USDT 6-decimal units
+      source?: 'block';
     };
 
 export type Alert = {

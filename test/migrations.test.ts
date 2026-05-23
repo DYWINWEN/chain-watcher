@@ -125,4 +125,16 @@ describe('migrations framework', () => {
       .get();
     expect(actionsTbl).toBeDefined();
   });
+
+  it('discovers and applies v1_008_polygon_tron.sql', () => {
+    const db = getDb();
+    const row = db
+      .prepare(`SELECT name FROM _migrations WHERE name = 'v1_008_polygon_tron.sql'`)
+      .get();
+    expect(row).toBeDefined();
+    const txIdx = db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_tx_chain_ts'`).get();
+    const alertIdx = db.prepare(`SELECT name FROM sqlite_master WHERE type='index' AND name='idx_alerts_chain_created'`).get();
+    expect(txIdx).toBeDefined();
+    expect(alertIdx).toBeDefined();
+  });
 });

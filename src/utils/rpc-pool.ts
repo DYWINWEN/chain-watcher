@@ -34,11 +34,15 @@ export function resolveWsUrls(chain: Chain): string[] {
     eth: SETTINGS.chain_eth_ws_urls,
     bsc: SETTINGS.chain_bsc_ws_urls,
     btc: SETTINGS.chain_btc_ws_urls,
+    polygon: SETTINGS.chain_polygon_ws_urls,
+    tron: '',
   };
   const URL_KEY: Record<Chain, string> = {
     eth: SETTINGS.chain_eth_ws_url,
     bsc: SETTINGS.chain_bsc_ws_url,
     btc: SETTINGS.chain_btc_ws_url,
+    polygon: SETTINGS.chain_polygon_ws_url,
+    tron: '',
   };
   const multi = getSetting<string[]>(URLS_KEY[chain], []);
   if (Array.isArray(multi) && multi.length > 0) return multi.filter((u) => typeof u === 'string' && u.length > 0);

@@ -20,6 +20,12 @@ const ChainCfgBtc = z.object({
   ws_urls: z.array(z.string().min(1)).optional(),
   api_base: z.string().min(1),
 });
+const ChainCfgTron = z.object({
+  enabled: z.boolean(),
+  api_base: z.string().min(1),
+  usdt_contract: z.string().min(1),
+  poll_interval_ms: z.number().int().positive().default(5000),
+});
 
 export const RootConfigSchema = z.object({
   threshold_usdt: z.number().nonnegative(),
@@ -32,6 +38,8 @@ export const RootConfigSchema = z.object({
     eth: ChainCfgEvm,
     bsc: ChainCfgEvm,
     btc: ChainCfgBtc,
+    polygon: ChainCfgEvm.optional(),
+    tron: ChainCfgTron.optional(),
   }),
   price_oracle: z.object({
     ttl_seconds: z.number().int().positive(),
@@ -102,6 +110,14 @@ const SETTINGS_KEYS = {
   chain_btc_ws_url: 'chain.btc.ws_url',
   chain_btc_ws_urls: 'chain.btc.ws_urls',
   chain_btc_api_base: 'chain.btc.api_base',
+  chain_polygon_enabled: 'chain.polygon.enabled',
+  chain_polygon_ws_url: 'chain.polygon.ws_url',
+  chain_polygon_ws_urls: 'chain.polygon.ws_urls',
+  chain_polygon_usdt: 'chain.polygon.usdt_contract',
+  chain_tron_enabled: 'chain.tron.enabled',
+  chain_tron_api_base: 'chain.tron.api_base',
+  chain_tron_usdt: 'chain.tron.usdt_contract',
+  chain_tron_poll_interval_ms: 'chain.tron.poll_interval_ms',
   price_ttl: 'price_oracle.ttl_seconds',
   tg_enabled: 'telegram.enabled',
   tg_bot_token: 'telegram.bot_token',
@@ -135,6 +151,14 @@ function flatten(cfg: RootConfig): Record<string, unknown> {
     [SETTINGS_KEYS.chain_btc_ws_url]: cfg.chains.btc.ws_url,
     [SETTINGS_KEYS.chain_btc_ws_urls]: cfg.chains.btc.ws_urls ?? [],
     [SETTINGS_KEYS.chain_btc_api_base]: cfg.chains.btc.api_base,
+    [SETTINGS_KEYS.chain_polygon_enabled]: cfg.chains.polygon?.enabled ?? false,
+    [SETTINGS_KEYS.chain_polygon_ws_url]: cfg.chains.polygon?.ws_url ?? '',
+    [SETTINGS_KEYS.chain_polygon_ws_urls]: cfg.chains.polygon?.ws_urls ?? [],
+    [SETTINGS_KEYS.chain_polygon_usdt]: cfg.chains.polygon?.usdt_contract ?? '',
+    [SETTINGS_KEYS.chain_tron_enabled]: cfg.chains.tron?.enabled ?? false,
+    [SETTINGS_KEYS.chain_tron_api_base]: cfg.chains.tron?.api_base ?? '',
+    [SETTINGS_KEYS.chain_tron_usdt]: cfg.chains.tron?.usdt_contract ?? '',
+    [SETTINGS_KEYS.chain_tron_poll_interval_ms]: cfg.chains.tron?.poll_interval_ms ?? 5000,
     [SETTINGS_KEYS.price_ttl]: cfg.price_oracle.ttl_seconds,
     [SETTINGS_KEYS.tg_enabled]: cfg.notifiers.telegram.enabled,
     [SETTINGS_KEYS.tg_bot_token]: cfg.notifiers.telegram.bot_token,

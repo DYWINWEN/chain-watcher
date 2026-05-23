@@ -26,6 +26,16 @@ chains:
     enabled: true
     api_base: 'https://mempool.space/api'
     ws_url: 'wss://mempool.space/api/v1/ws'
+  polygon:
+    enabled: false
+    ws_url: ${POLYGON_WS_URL}
+    usdt_contract: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F'
+    decimals: 6
+  tron:
+    enabled: false
+    api_base: 'https://api.trongrid.io'
+    usdt_contract: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'
+    poll_interval_ms: 5000
 
 price_oracle:
   ttl_seconds: 60
