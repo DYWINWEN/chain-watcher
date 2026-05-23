@@ -56,30 +56,64 @@ function recordAlert(
 ): AlertNewPayload {
   const db = getDb();
   const now = Math.floor(Date.now() / 1000);
-  const pivotFull = getLabels(tx.chain, pivot).map((l) => ({
-    label: l.label, category: l.category, riskScore: l.riskScore,
-  }));
-  const cpFull = getLabels(tx.chain, counterparty).map((l) => ({
-    label: l.label, category: l.category, riskScore: l.riskScore,
-  }));
-  // Use rule's declared severity (overrides computed severity for DSL rules)
+  const pivotFull = getLabels(tx.chain, pivot).map((l) => ({ label: l.label, category: l.category, riskScore: l.riskScore }));
+  const cpFull = getLabels(tx.chain, counterparty).map((l) => ({ label: l.label, category: l.category, riskScore: l.riskScore }));
   const finalSev = rule.severity;
+  const source = tx.source ?? 'block';
+  const status = source === 'mempool' ? 'pending' : 'confirmed';
+  const confirmedBlock = source === 'block' ? tx.blockNumber : null;
 
   const res = db
     .prepare(
       `INSERT INTO alerts (chain, rule, pivot_address, counterparty, trigger_tx_hash,
                            window_tx_hashes, amount_usdt, created_at,
-                           pivot_labels, counterparty_labels, severity, rule_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                           pivot_labels, counterparty_labels, severity, rule_id,
+                           status, source, confirmed_block)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       tx.chain, rule.id, pivot, counterparty, tx.txHash,
       '[]', tx.amountUsdt, now,
       JSON.stringify(pivotFull), JSON.stringify(cpFull), finalSev, rule.id,
+      status, source, confirmedBlock,
     );
 
+  const newAlertId = Number(res.lastInsertRowid);
+
+  if (source === 'mempool') {
+    // Upsert mempool_pending row
+    db.prepare(
+      `INSERT INTO mempool_pending (chain, tx_hash, first_seen, first_seen_block, alert_count)
+         VALUES (?, ?, ?, ?, 1)
+         ON CONFLICT(chain, tx_hash) DO UPDATE SET alert_count = alert_count + 1`,
+    ).run(tx.chain, tx.txHash, now, tx.blockNumber); // tx.blockNumber is 0 for mempool — that's fine; sweeper uses head separately
+  } else {
+    // source === 'block' — flip any pending alerts for this tx_hash
+    const pendingRows = db
+      .prepare(
+        `SELECT id FROM alerts WHERE trigger_tx_hash = ? AND status = 'pending'`,
+      )
+      .all(tx.txHash) as Array<{ id: number }>;
+    if (pendingRows.length > 0) {
+      const flip = db.prepare(
+        `UPDATE alerts SET status = 'confirmed', confirmed_block = ? WHERE id = ?`,
+      );
+      const insertAction = db.prepare(
+        `INSERT INTO alert_actions (alert_id, action, actor, ts) VALUES (?, 'confirmed', 'system', ?)`,
+      );
+      for (const r of pendingRows) {
+        flip.run(tx.blockNumber, r.id);
+        insertAction.run(r.id, now);
+        bus.emit(EVENTS.AlertConfirmed, { id: r.id, confirmedBlock: tx.blockNumber });
+      }
+      db.prepare(
+        `UPDATE mempool_pending SET confirmed_block = ? WHERE chain = ? AND tx_hash = ?`,
+      ).run(tx.blockNumber, tx.chain, tx.txHash);
+    }
+  }
+
   const payload: AlertNewPayload = {
-    id: Number(res.lastInsertRowid),
+    id: newAlertId,
     chain: tx.chain,
     rule: rule.id,
     pivotAddress: pivot,
