@@ -30,7 +30,7 @@ async function ensureBot(): Promise<TelegramBotInstance | null> {
 
 function formatAlert(a: AlertNewPayload): string {
   const lines = [
-    `*chain-watcher alert*`,
+    `*chain-watcher alert* [${a.severity}]`,
     `chain: ${a.chain}`,
     `rule: ${a.rule}`,
     `pivot: \`${a.pivotAddress}\``,
@@ -41,20 +41,6 @@ function formatAlert(a: AlertNewPayload): string {
   return lines.join('\n');
 }
 
-const alertListener = (a: AlertNewPayload) => {
-  void (async () => {
-    const b = await ensureBot();
-    if (!b) return;
-    const chatId = getSetting<string>(SETTINGS.tg_chat_id, '');
-    if (!chatId) return;
-    try {
-      await b.sendMessage(chatId, formatAlert(a), { parse_mode: 'Markdown' });
-    } catch (err) {
-      logger.warn({ err: (err as Error).message }, 'tg send failed');
-    }
-  })();
-};
-
 const configListener = (p: ConfigChangedPayload) => {
   if (typeof p.key !== 'string') return;
   if (!p.key.startsWith('telegram.')) return;
@@ -64,7 +50,18 @@ const configListener = (p: ConfigChangedPayload) => {
 export async function startTelegramNotifier(): Promise<void> {
   if (started) return;
   started = true;
-  bus.on(EVENTS.AlertNew, alertListener);
+  const { setChannelHandler } = await import('./router.js');
+  setChannelHandler('tg', async (alert) => {
+    const b = await ensureBot();
+    if (!b) return;
+    const chatId = getSetting<string>(SETTINGS.tg_chat_id, '');
+    if (!chatId) return;
+    try {
+      await b.sendMessage(chatId, formatAlert(alert), { parse_mode: 'Markdown' });
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, 'tg send failed');
+    }
+  });
   bus.on(EVENTS.ConfigChanged, configListener);
   await ensureBot();
 }
@@ -72,7 +69,6 @@ export async function startTelegramNotifier(): Promise<void> {
 export async function stopTelegramNotifier(): Promise<void> {
   if (!started) return;
   started = false;
-  bus.off(EVENTS.AlertNew, alertListener);
   bus.off(EVENTS.ConfigChanged, configListener);
   bot = null;
 }
