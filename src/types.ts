@@ -13,6 +13,8 @@ export type NormalizedTx = {
   amountRaw: string;       // bigint string (no scaling)
   amountUsdt: number;
   replay?: boolean;        // true for backfilled txs; suppresses alerts during replay
+  fromLabels?: string[];   // label NAMES only; full Label objects via getLabels()
+  toLabels?: string[];
 };
 
 export type RawEvent =

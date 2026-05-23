@@ -20,6 +20,8 @@ export type AlertNewPayload = {
   windowTxHashes: string[];
   amountUsdt: number;
   createdAt: number;
+  pivotLabels: Array<{ label: string; category: string; riskScore: number }>;
+  counterpartyLabels: Array<{ label: string; category: string; riskScore: number }>;
 };
 export type LabelsChangedPayload = { chain: Chain; address: string };
 

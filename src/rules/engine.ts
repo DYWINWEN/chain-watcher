@@ -6,6 +6,7 @@ import type { NormalizedTx } from '../types.js';
 import { pushAndCheck } from './window-store.js';
 import { isCexBlacklisted, isUserWhitelisted } from './blacklist.js';
 import { scheduleBackfill } from './backfill.js';
+import { getLabels } from '../labels/lookup.js';
 
 function currentConfig() {
   return {
@@ -49,12 +50,27 @@ function recordAlert(
 ): AlertNewPayload {
   const db = getDb();
   const now = Math.floor(Date.now() / 1000);
+  // pivot is tx.from for sender rule, tx.to for receiver rule.
+  // Look up full Label objects (with category + risk) for the snapshot;
+  // tx.fromLabels/toLabels carry only label strings, so we re-query.
+  const pivotFull = getLabels(tx.chain, pivot).map((l) => ({
+    label: l.label, category: l.category, riskScore: l.riskScore,
+  }));
+  const cpFull = getLabels(tx.chain, counterparty).map((l) => ({
+    label: l.label, category: l.category, riskScore: l.riskScore,
+  }));
   const res = db
     .prepare(
-      `INSERT INTO alerts (chain, rule, pivot_address, counterparty, trigger_tx_hash, window_tx_hashes, amount_usdt, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO alerts (chain, rule, pivot_address, counterparty, trigger_tx_hash,
+                           window_tx_hashes, amount_usdt, created_at,
+                           pivot_labels, counterparty_labels)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(tx.chain, rule, pivot, counterparty, tx.txHash, JSON.stringify(windowTxHashes), tx.amountUsdt, now);
+    .run(
+      tx.chain, rule, pivot, counterparty, tx.txHash,
+      JSON.stringify(windowTxHashes), tx.amountUsdt, now,
+      JSON.stringify(pivotFull), JSON.stringify(cpFull),
+    );
   const payload: AlertNewPayload = {
     id: Number(res.lastInsertRowid),
     chain: tx.chain,
@@ -65,6 +81,8 @@ function recordAlert(
     windowTxHashes,
     amountUsdt: tx.amountUsdt,
     createdAt: now,
+    pivotLabels: pivotFull,
+    counterpartyLabels: cpFull,
   };
   bus.emit(EVENTS.AlertNew, payload);
   return payload;
