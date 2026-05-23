@@ -15,6 +15,7 @@ export type NormalizedTx = {
   replay?: boolean;        // true for backfilled txs; suppresses alerts during replay
   fromLabels?: string[];   // label NAMES only; full Label objects via getLabels()
   toLabels?: string[];
+  source?: 'block' | 'mempool';   // default 'block' when unset
 };
 
 export type RawEvent =
@@ -28,6 +29,19 @@ export type RawEvent =
       from: string;
       to: string;
       valueRaw: string;
+      source?: 'block';
+    }
+  | {
+      kind: 'evm-mempool-tx';
+      chain: 'eth' | 'bsc';
+      txHash: string;
+      logIndex: number;
+      blockNumber: number;
+      timestamp: number;
+      from: string;
+      to: string;
+      valueRaw: string;
+      source: 'mempool';
     }
   | {
       kind: 'btc-vout';

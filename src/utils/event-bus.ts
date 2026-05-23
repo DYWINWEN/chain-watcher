@@ -4,6 +4,8 @@ import type { Chain } from '../types.js';
 export const EVENTS = {
   ConfigChanged: 'config:changed',
   AlertNew: 'alert:new',
+  AlertConfirmed: 'alert:confirmed',
+  AlertDropped: 'alert:dropped',
   TxNormalized: 'tx:normalized',
   IngestorDown: 'ingestor:down',
   LabelsChanged: 'labels:changed',
@@ -25,6 +27,8 @@ export type AlertNewPayload = {
   pivotLabels: Array<{ label: string; category: string; riskScore: number }>;
   counterpartyLabels: Array<{ label: string; category: string; riskScore: number }>;
 };
+export type AlertConfirmedPayload = { id: number; confirmedBlock: number };
+export type AlertDroppedPayload = { id: number };
 export type LabelsChangedPayload = { chain: Chain; address: string };
 export type RuleChangedPayload = { id: string };
 
