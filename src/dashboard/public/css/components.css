@@ -474,3 +474,34 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 .rule-card .footer .edit-link {
   margin-left: auto; color: var(--accent-soft); cursor: pointer;
 }
+
+/* ===== M15 alert status badges ===== */
+.badge-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); font-weight: 600;
+}
+.badge-status.pending {
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface-1));
+  color: var(--warning);
+}
+.badge-status.pending::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--warning); animation: badge-pulse 1.2s ease-in-out infinite;
+}
+.badge-status.confirmed {
+  background: color-mix(in srgb, var(--success) 18%, var(--surface-1));
+  color: var(--success);
+}
+.badge-status.dropped {
+  background: color-mix(in srgb, var(--text-subtle) 18%, var(--surface-1));
+  color: var(--text-subtle);
+}
+.alert-card.dropped { opacity: 0.6; }
+.alert-card.dropped .amount,
+.alert-card.dropped .addr { text-decoration: line-through; }
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}

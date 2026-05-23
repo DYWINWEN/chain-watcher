@@ -81,6 +81,28 @@ export async function renderAlerts(root) {
       meta.textContent = `${filtered.length} of ${alerts.length} alerts (filtered)`;
     }
   });
+
+  onSse('alert:confirmed', (data) => {
+    // data: { id, confirmedBlock }
+    const card = list.querySelector(`[data-alert-id="${data.id}"]`);
+    if (!card) return;
+    const badge = card.querySelector('[data-status]');
+    if (badge) {
+      badge.className = 'badge-status confirmed';
+      badge.textContent = 'confirmed';
+    }
+  });
+
+  onSse('alert:dropped', (data) => {
+    const card = list.querySelector(`[data-alert-id="${data.id}"]`);
+    if (!card) return;
+    card.classList.add('dropped');
+    const badge = card.querySelector('[data-status]');
+    if (badge) {
+      badge.className = 'badge-status dropped';
+      badge.textContent = 'dropped';
+    }
+  });
 }
 
 function alertCard(a) {
@@ -92,13 +114,15 @@ function alertCard(a) {
   const ts = a.created_at ?? a.createdAt;
 
   const card = document.createElement('div');
-  card.className = 'card';
+  card.className = `card alert-card ${a.status === 'dropped' ? 'dropped' : ''}`;
+  card.dataset.alertId = a.id;
   card.style.padding = 'var(--sp-5)';
   card.style.cursor = 'pointer';
   card.style.transition = 'background 120ms ease, border-color 120ms ease';
 
   card.innerHTML = `
     <div style="display:flex;align-items:center;gap:var(--sp-3);">
+      <span class="badge-status ${a.status ?? 'confirmed'}" data-status>${a.status ?? 'confirmed'}</span>
       <span style="width:8px;height:8px;border-radius:50%;background:var(--chain-${chain});"></span>
       <strong style="color:var(--chain-${chain}); font-size:var(--fs-sm); font-weight:600;">${CHAIN_LABEL[chain] ?? chain}</strong>
       <span class="subtle">·</span>
