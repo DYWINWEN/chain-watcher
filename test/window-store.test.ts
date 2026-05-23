@@ -41,7 +41,9 @@ describe('pushAndCheck', () => {
     expect(pushAndCheck('bsc', '0xb', 'in', '0xsame', 't6', 5).hit).toBe(true);  // window is now all 0xsame
   });
 
-  it('never hits with window_size=1', () => {
+  // Config validation rejects window_size=1 at the schema layer (see test/config.test.ts).
+  // window-store itself remains defensive in case an internal caller bypasses config.
+  it('window_size=1 is defensively rejected by window-store (no hit, no crash)', () => {
     const r = pushAndCheck('eth', '0xc', 'out', '0xany', 't0', 1);
     expect(r.hit).toBe(false);
   });

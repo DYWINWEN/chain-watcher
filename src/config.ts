@@ -22,8 +22,8 @@ const ChainCfgBtc = z.object({
 export const RootConfigSchema = z.object({
   threshold_usdt: z.number().nonnegative(),
   rules: z.object({
-    sender_repeats_to: z.object({ enabled: z.boolean(), window_size: z.number().int().min(1).max(20) }),
-    receiver_repeats_from: z.object({ enabled: z.boolean(), window_size: z.number().int().min(1).max(20) }),
+    sender_repeats_to: z.object({ enabled: z.boolean(), window_size: z.number().int().min(2).max(20) }),
+    receiver_repeats_from: z.object({ enabled: z.boolean(), window_size: z.number().int().min(2).max(20) }),
   }),
   blacklist_cex: z.boolean(),
   chains: z.object({
