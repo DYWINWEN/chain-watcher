@@ -118,20 +118,26 @@ export async function startDashboard(): Promise<void> {
     });
   });
 
-  app.get('/api/stats', (_req, res) => {
-    const buckets = getDb()
+  app.get('/api/stats', (req, res) => {
+    const hours = Math.max(1, Math.min(24 * 30, Number(req.query.hours) || 24 * 7));
+    const bucketSec = hours <= 6 ? 300 : hours <= 24 ? 1800 : hours <= 168 ? 3600 : 21600;
+    const db = getDb();
+    const cutoff = Math.floor(Date.now() / 1000) - hours * 3600;
+    const buckets = db
       .prepare(
-        `SELECT (created_at / 3600) * 3600 AS bucket, chain, COUNT(*) AS n
-           FROM alerts
-          WHERE created_at > strftime('%s','now') - 7*24*3600
-          GROUP BY bucket, chain
-          ORDER BY bucket ASC`,
+        `SELECT (created_at / ?) * ? AS bucket, chain, rule, COUNT(*) AS n
+           FROM alerts WHERE created_at > ?
+           GROUP BY bucket, chain, rule
+           ORDER BY bucket ASC`,
       )
-      .all();
-    const txTotals = getDb()
-      .prepare('SELECT chain, COUNT(*) AS n FROM tx GROUP BY chain')
-      .all();
-    res.json({ alertBuckets: buckets, txTotals });
+      .all(bucketSec, bucketSec, cutoff);
+    const txTotals = db
+      .prepare('SELECT chain, COUNT(*) AS n FROM tx WHERE ts > ? GROUP BY chain')
+      .all(cutoff);
+    const ruleTotals = db
+      .prepare('SELECT rule, COUNT(*) AS n FROM alerts WHERE created_at > ? GROUP BY rule')
+      .all(cutoff);
+    res.json({ hours, bucketSec, alertBuckets: buckets, txTotals, ruleTotals });
   });
 
   app.get('/api/settings', (_req, res) => {
