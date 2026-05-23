@@ -33,6 +33,10 @@ async function main(): Promise<void> {
   const seedDir = join(process.cwd(), 'config', 'labels-seed');
   seedEtherscanLabels('eth', join(seedDir, 'eth.json'));
   seedEtherscanLabels('bsc', join(seedDir, 'bsc.json'));
+
+  const { seedSubscriptionsIfEmpty } = await import('./notifiers/router.js');
+  seedSubscriptionsIfEmpty();
+
   startOfacRefresher();
 
   await startDecoderWorker();
