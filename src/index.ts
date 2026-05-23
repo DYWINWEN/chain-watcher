@@ -41,6 +41,9 @@ async function main(): Promise<void> {
   seedBuiltInRules();
   await reloadRules();
 
+  const { startMempoolSweeper } = await import('./jobs/mempool-sweeper.js');
+  startMempoolSweeper();
+
   const { setChannelHandler } = await import('./notifiers/router.js');
   const { sendToWebhook } = await import('./notifiers/webhook.js');
   setChannelHandler('webhook', async (alert) => {
@@ -113,6 +116,8 @@ async function main(): Promise<void> {
     await Promise.allSettled([stopIngestors(), stopWorkers(), stopDashboard(), stopTelegramNotifier()]);
     const { stopOfacRefresher } = await import('./labels/refresher.js');
     stopOfacRefresher();
+    const { stopMempoolSweeper } = await import('./jobs/mempool-sweeper.js');
+    stopMempoolSweeper();
     closeDb();
     process.exit(0);
   };
