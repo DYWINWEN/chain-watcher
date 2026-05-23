@@ -86,7 +86,7 @@ export async function evaluateCondition(
   c: Condition,
   tx: NormalizedTx,
   deps: EvalDeps,
-  rule: RuleDsl,
+  _rule: RuleDsl,
 ): Promise<boolean> {
   if ('field' in c) {
     return scalarOp(c.op, readField(tx, c.field), c.value);

@@ -1,4 +1,4 @@
-import type Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import type { Chain } from '../types.js';
 import { logger } from '../utils/logger.js';
 

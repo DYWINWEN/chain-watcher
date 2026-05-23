@@ -7,19 +7,24 @@ import { pushAndCheck } from './window-store.js';
 import { isCexBlacklisted, isUserWhitelisted } from './blacklist.js';
 import { scheduleBackfill } from './backfill.js';
 import { getLabels } from '../labels/lookup.js';
-import { assignSeverity } from '../notifiers/severity.js';
 import { routeAlert } from '../notifiers/router.js';
+import { getCompiledRules } from './rule-loader.js';
+import { pickFrequencyCounter } from './frequency-counter.js';
+import { connection } from '../queues/index.js';
+import type { CompiledRule } from './dsl/compile.js';
+import type { EvalDeps } from './dsl/ast.js';
 
-function currentConfig() {
-  return {
-    threshold: getSetting<number>(SETTINGS.threshold_usdt, 100),
-    senderEnabled: getSetting<boolean>(SETTINGS.rule_sender_enabled, true),
-    senderWindow: getSetting<number>(SETTINGS.rule_sender_window, 5),
-    receiverEnabled: getSetting<boolean>(SETTINGS.rule_receiver_enabled, true),
-    receiverWindow: getSetting<number>(SETTINGS.rule_receiver_window, 5),
-    blacklistOn: getSetting<boolean>(SETTINGS.blacklist_cex, true),
-    backfillEnabled: getSetting<boolean>(SETTINGS.backfill_enabled, true),
+let depsCache: EvalDeps | null = null;
+
+async function deps(): Promise<EvalDeps> {
+  if (depsCache) return depsCache;
+  const freq = await pickFrequencyCounter(connection);
+  depsCache = {
+    freq,
+    getLabels,
+    pushAndCheckWindow: pushAndCheck,
   };
+  return depsCache;
 }
 
 function storeTx(tx: NormalizedTx): boolean {
@@ -45,48 +50,47 @@ function storeTx(tx: NormalizedTx): boolean {
 
 function recordAlert(
   tx: NormalizedTx,
-  rule: 'sender_repeats_to' | 'receiver_repeats_from',
+  rule: CompiledRule,
   pivot: string,
   counterparty: string,
-  windowTxHashes: string[],
 ): AlertNewPayload {
   const db = getDb();
   const now = Math.floor(Date.now() / 1000);
-  // pivot is tx.from for sender rule, tx.to for receiver rule.
-  // Look up full Label objects (with category + risk) for the snapshot;
-  // tx.fromLabels/toLabels carry only label strings, so we re-query.
   const pivotFull = getLabels(tx.chain, pivot).map((l) => ({
     label: l.label, category: l.category, riskScore: l.riskScore,
   }));
   const cpFull = getLabels(tx.chain, counterparty).map((l) => ({
     label: l.label, category: l.category, riskScore: l.riskScore,
   }));
-  const sev = assignSeverity({ amountUsdt: tx.amountUsdt, pivotLabels: pivotFull, counterpartyLabels: cpFull });
+  // Use rule's declared severity (overrides computed severity for DSL rules)
+  const finalSev = rule.severity;
+
   const res = db
     .prepare(
       `INSERT INTO alerts (chain, rule, pivot_address, counterparty, trigger_tx_hash,
                            window_tx_hashes, amount_usdt, created_at,
-                           pivot_labels, counterparty_labels, severity)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                           pivot_labels, counterparty_labels, severity, rule_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      tx.chain, rule, pivot, counterparty, tx.txHash,
-      JSON.stringify(windowTxHashes), tx.amountUsdt, now,
-      JSON.stringify(pivotFull), JSON.stringify(cpFull), sev,
+      tx.chain, rule.id, pivot, counterparty, tx.txHash,
+      '[]', tx.amountUsdt, now,
+      JSON.stringify(pivotFull), JSON.stringify(cpFull), finalSev, rule.id,
     );
+
   const payload: AlertNewPayload = {
     id: Number(res.lastInsertRowid),
     chain: tx.chain,
-    rule,
+    rule: rule.id,
     pivotAddress: pivot,
     counterparty,
     triggerTxHash: tx.txHash,
-    windowTxHashes,
+    windowTxHashes: [],
     amountUsdt: tx.amountUsdt,
     createdAt: now,
-    severity: sev,
     pivotLabels: pivotFull,
     counterpartyLabels: cpFull,
+    severity: finalSev,
   };
   bus.emit(EVENTS.AlertNew, payload);
   void routeAlert(payload);
@@ -94,37 +98,56 @@ function recordAlert(
 }
 
 export async function onNormalizedTx(tx: NormalizedTx): Promise<void> {
-  const cfg = currentConfig();
-  if (tx.amountUsdt <= cfg.threshold) return;
+  if (tx.amountUsdt <= getSetting<number>(SETTINGS.threshold_usdt, 100)) return;
 
   const stored = storeTx(tx);
   if (!stored) return; // dupe — already processed
 
-  // 1) sender → repeated `to`
-  if (cfg.senderEnabled) {
-    const res = pushAndCheck(tx.chain, tx.from, 'out', tx.to, tx.txHash, cfg.senderWindow);
-    if (res.hit && !tx.replay) {
-      const skip = cfg.blacklistOn && isCexBlacklisted(tx.chain, tx.to);
-      const whitelisted = isUserWhitelisted(tx.chain, tx.from) || isUserWhitelisted(tx.chain, tx.to);
-      if (!skip && !whitelisted) {
-        const alert = recordAlert(tx, 'sender_repeats_to', tx.from, tx.to, res.windowTxHashes);
-        logger.info({ alert }, 'ALERT sender_repeats_to');
-      }
+  const evalDeps = await deps();
+  const rules = getCompiledRules();
+  for (const rule of rules) {
+    let hit = false;
+    try {
+      hit = await rule.evaluate(tx, evalDeps);
+    } catch (err) {
+      logger.warn({ err: (err as Error).message, ruleId: rule.id }, 'rule eval error');
+      continue;
     }
-    if (cfg.backfillEnabled) scheduleBackfill(tx.chain, tx.from, 'out');
+    if (!hit || tx.replay) continue;
+
+    // For repeat_* rules, re-derive pivot/counterparty from the rule's first condition.
+    const firstCond = rule.raw.when[0];
+    let pivot = tx.from;
+    let counterparty = tx.to;
+    if (firstCond && 'type' in firstCond && firstCond.type === 'repeat_from_same') {
+      pivot = tx.to;
+      counterparty = tx.from;
+    }
+
+    // Existing blacklist + whitelist gate stays.
+    const blacklistOn = getSetting<boolean>(SETTINGS.blacklist_cex, true);
+    const skip = blacklistOn && isCexBlacklisted(tx.chain, counterparty);
+    const whitelisted = isUserWhitelisted(tx.chain, tx.from) || isUserWhitelisted(tx.chain, tx.to);
+    if (skip || whitelisted) continue;
+
+    const alert = recordAlert(tx, rule, pivot, counterparty);
+    logger.info({ alert }, `ALERT ${rule.id}`);
+
+    // Update fire_count + last_fired_at (best-effort)
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      getDb().prepare(`UPDATE rules SET fire_count = fire_count + 1, last_fired_at = ? WHERE id = ?`).run(now, rule.id);
+    } catch { /* swallow */ }
   }
 
-  // 2) receiver ← repeated `from`
-  if (cfg.receiverEnabled) {
-    const res = pushAndCheck(tx.chain, tx.to, 'in', tx.from, tx.txHash, cfg.receiverWindow);
-    if (res.hit && !tx.replay) {
-      const skip = cfg.blacklistOn && isCexBlacklisted(tx.chain, tx.from);
-      const whitelisted = isUserWhitelisted(tx.chain, tx.from) || isUserWhitelisted(tx.chain, tx.to);
-      if (!skip && !whitelisted) {
-        const alert = recordAlert(tx, 'receiver_repeats_from', tx.to, tx.from, res.windowTxHashes);
-        logger.info({ alert }, 'ALERT receiver_repeats_from');
-      }
-    }
-    if (cfg.backfillEnabled) scheduleBackfill(tx.chain, tx.to, 'in');
+  // Frequency feed: every above-threshold tx contributes to both group_by buckets
+  // so future frequency conditions can count it. Fire-and-forget.
+  void evalDeps.freq.add(tx.chain, `from_addr:${tx.from}`, tx.timestamp, tx.txHash);
+  void evalDeps.freq.add(tx.chain, `to_addr:${tx.to}`, tx.timestamp, tx.txHash);
+
+  // Backfill schedule for both sides — unchanged from v1
+  if (getSetting<boolean>(SETTINGS.backfill_enabled, true)) {
+    scheduleBackfill(tx.chain, tx.from, 'out');
+    scheduleBackfill(tx.chain, tx.to, 'in');
   }
 }
