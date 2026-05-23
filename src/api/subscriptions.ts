@@ -7,7 +7,7 @@ subscriptionsRouter.get('/api/subscriptions', (_req, res) => {
   const rows = getDb()
     .prepare(
       `SELECT id, channel, min_severity AS minSeverity, chain_filter AS chainFilter,
-              rule_filter AS ruleFilter, silence_until AS silenceUntil, enabled,
+              rule_filter AS ruleFilter, silence_until AS silenceUntil, enabled, config,
               created_at AS createdAt, updated_at AS updatedAt
          FROM subscriptions ORDER BY id`,
     )
@@ -16,7 +16,7 @@ subscriptionsRouter.get('/api/subscriptions', (_req, res) => {
 });
 
 subscriptionsRouter.post('/api/subscriptions', (req, res): void => {
-  const { channel, minSeverity, chainFilter, ruleFilter, silenceUntil, enabled } = req.body ?? {};
+  const { channel, minSeverity, chainFilter, ruleFilter, silenceUntil, enabled, config } = req.body ?? {};
   if (!channel || !minSeverity) {
     res.status(400).json({ error: 'channel + minSeverity required' });
     return;
@@ -25,8 +25,8 @@ subscriptionsRouter.post('/api/subscriptions', (req, res): void => {
   const result = getDb()
     .prepare(
       `INSERT INTO subscriptions (channel, min_severity, chain_filter, rule_filter,
-                                  silence_until, enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                                  silence_until, enabled, config, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       String(channel),
@@ -35,6 +35,7 @@ subscriptionsRouter.post('/api/subscriptions', (req, res): void => {
       ruleFilter ?? null,
       silenceUntil ?? null,
       enabled === false ? 0 : 1,
+      typeof config === 'string' ? config : JSON.stringify(config ?? {}),
       now,
       now,
     );
@@ -47,7 +48,7 @@ subscriptionsRouter.patch('/api/subscriptions/:id', (req, res): void => {
     res.status(400).json({ error: 'invalid id' });
     return;
   }
-  const allowed = ['channel', 'min_severity', 'chain_filter', 'rule_filter', 'silence_until', 'enabled'];
+  const allowed = ['channel', 'min_severity', 'chain_filter', 'rule_filter', 'silence_until', 'enabled', 'config'];
   const camelMap: Record<string, string> = {
     minSeverity: 'min_severity',
     chainFilter: 'chain_filter',
@@ -60,7 +61,9 @@ subscriptionsRouter.patch('/api/subscriptions/:id', (req, res): void => {
     const col = camelMap[k] ?? k;
     if (!allowed.includes(col)) continue;
     sets.push(`${col} = ?`);
-    params.push(col === 'enabled' ? (v ? 1 : 0) : v);
+    let value = v;
+    if (col === 'config' && typeof value === 'object' && value !== null) value = JSON.stringify(value);
+    params.push(col === 'enabled' ? (v ? 1 : 0) : value);
   }
   if (sets.length === 0) {
     res.json({ ok: true });
