@@ -157,6 +157,7 @@ export class EvmIngestor extends Ingestor {
       from: (parsed.args.from as string).toLowerCase(),
       to: (parsed.args.to as string).toLowerCase(),
       valueRaw: (parsed.args.value as bigint).toString(),
+      source: 'block',
     });
     this.saveCheckpoint(log.blockNumber);
   }
