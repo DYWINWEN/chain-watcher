@@ -5,11 +5,13 @@ import { renderAlerts } from './pages/alerts.js';
 import { renderWatchlist } from './pages/watchlist.js';
 import { renderStats } from './pages/stats.js';
 import { renderSettings } from './pages/settings.js';
+import { renderLabels } from './pages/labels.js';
 
 const ROUTES = {
   '/alerts': { render: renderAlerts, title: 'Alerts', subtitle: 'Real-time signals from BSC, BTC, ETH' },
   '/watchlist': { render: renderWatchlist, title: 'Watchlist', subtitle: 'Inspect any address — windows, related alerts' },
   '/stats': { render: renderStats, title: 'Stats', subtitle: 'Hits per chain over time' },
+  '/labels': { render: renderLabels, title: 'Labels', subtitle: 'Browse + manage address tags from OFAC, etherscan-labels, and your own' },
   '/settings': { render: renderSettings, title: 'Settings', subtitle: 'All analysis parameters, live' },
 };
 
