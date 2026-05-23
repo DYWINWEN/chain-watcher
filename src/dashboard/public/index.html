@@ -1,22 +1,50 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>chain-watcher</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
   </head>
   <body>
-    <header>
-      <h1>chain-watcher</h1>
-      <nav>
-        <a href="/alerts">Alerts</a>
-        <a href="/watchlist">Watchlist</a>
-        <a href="/stats">Stats</a>
-        <a href="/settings">Settings</a>
-      </nav>
-      <span id="sse-status">SSE: …</span>
-    </header>
-    <main id="root"></main>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="logo"></span>
+          <span class="name">chain-watcher</span>
+        </div>
+        <nav id="nav">
+          <a class="nav-item" data-route="/alerts" href="/alerts">
+            <span class="icon">●</span><span>Alerts</span>
+          </a>
+          <a class="nav-item" data-route="/watchlist" href="/watchlist">
+            <span class="icon">◇</span><span>Watchlist</span>
+          </a>
+          <a class="nav-item" data-route="/stats" href="/stats">
+            <span class="icon">▤</span><span>Stats</span>
+          </a>
+          <a class="nav-item" data-route="/settings" href="/settings">
+            <span class="icon">⚙</span><span>Settings</span>
+          </a>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <h1 id="page-title">…</h1>
+          <span class="subtitle" id="page-subtitle"></span>
+          <div class="spacer"></div>
+          <span id="live-indicator" class="live-pill offline">SSE</span>
+          <button id="theme-toggle" class="btn ghost" title="Toggle theme">◐</button>
+        </header>
+        <div id="page-root"></div>
+      </main>
+    </div>
+
+    <div id="toast-root" aria-live="polite" aria-atomic="true"></div>
+    <div id="drawer-root"></div>
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script type="module" src="/static/app.js"></script>
   </body>
