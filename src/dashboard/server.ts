@@ -7,6 +7,7 @@ import { getAllSettings, setSetting, getSetting, SETTINGS } from '../config.js';
 import { attachSseClient } from '../notifiers/sse-bus.js';
 import { logger } from '../utils/logger.js';
 import { labelsRouter } from '../api/labels.js';
+import { subscriptionsRouter } from '../api/subscriptions.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +19,7 @@ export async function startDashboard(): Promise<void> {
   const app = express();
   app.use(express.json({ limit: '256kb' }));
   app.use(labelsRouter);
+  app.use(subscriptionsRouter);
 
   // ----- pages -----
   app.use('/static', express.static(join(__dirname, 'public')));

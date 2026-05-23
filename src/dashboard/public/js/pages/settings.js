@@ -58,6 +58,41 @@ export async function renderSettings(root) {
     <div id="sources-body" style="display:flex; flex-direction:column; gap:var(--sp-3);"></div>`;
   root.appendChild(sourcesCard);
   await renderLabelSources(sourcesCard.querySelector('#sources-body'));
+
+  // M12: subscriptions card
+  const subsCard = document.createElement('div');
+  subsCard.className = 'card';
+  subsCard.style.marginTop = 'var(--sp-4)';
+  subsCard.innerHTML = `<h2 style="font-size:var(--fs-md); margin:0 0 var(--sp-3); color:var(--accent-soft);">Subscriptions</h2>
+    <div class="muted" style="font-size:var(--fs-sm); margin-bottom:var(--sp-3);">
+      Decide which notifier channels each alert reaches. Dashboard is universal (always receives via SSE).
+    </div>
+    <div id="subs-body" style="display:flex; flex-direction:column; gap:var(--sp-2);"></div>
+    <div style="display:flex; gap:var(--sp-2); margin-top:var(--sp-3); align-items:center;">
+      <select id="sub-add-channel">
+        <option value="tg">tg</option>
+        <option value="webhook">webhook</option>
+        <option value="discord">discord</option>
+        <option value="slack">slack</option>
+      </select>
+      <select id="sub-add-sev">
+        <option value="P1">P1 only</option>
+        <option value="P2" selected>P2+</option>
+        <option value="P3">All (P3+)</option>
+      </select>
+      <button id="sub-add" class="btn">Add subscription</button>
+    </div>`;
+  root.appendChild(subsCard);
+  await renderSubs(subsCard.querySelector('#subs-body'));
+  subsCard.querySelector('#sub-add').addEventListener('click', async () => {
+    const channel = subsCard.querySelector('#sub-add-channel').value;
+    const minSeverity = subsCard.querySelector('#sub-add-sev').value;
+    try {
+      await apiPost('/api/subscriptions', { channel, minSeverity });
+      toast({ kind: 'success', message: 'Subscription added' });
+      await renderSubs(subsCard.querySelector('#subs-body'));
+    } catch { /* toasted */ }
+  });
 }
 
 function settingRow(key, currentValue) {
@@ -209,6 +244,48 @@ async function renderLabelSources(body) {
       } catch { /* api.js already toasted */ }
       // Re-render after a short delay so the status reflects.
       setTimeout(() => void renderLabelSources(body), 1500);
+    });
+  }
+}
+
+async function renderSubs(body) {
+  const rows = await apiGet('/api/subscriptions');
+  if (rows.length === 0) {
+    body.innerHTML = '<div class="muted">No subscriptions configured.</div>';
+    return;
+  }
+  body.innerHTML = rows.map((s) => `
+    <div style="display:flex; gap:var(--sp-3); align-items:center; padding:var(--sp-2); border:1px solid var(--border); border-radius:var(--r-sm);">
+      <strong style="min-width:90px;">${s.channel}</strong>
+      <select data-id="${s.id}" data-key="minSeverity">
+        <option ${s.minSeverity === 'P1' ? 'selected' : ''}>P1</option>
+        <option ${s.minSeverity === 'P2' ? 'selected' : ''}>P2</option>
+        <option ${s.minSeverity === 'P3' ? 'selected' : ''}>P3</option>
+      </select>
+      <label style="display:flex; align-items:center; gap:var(--sp-1);">
+        <input type="checkbox" data-id="${s.id}" data-key="enabled" ${s.enabled ? 'checked' : ''} />
+        enabled
+      </label>
+      <span style="flex:1;"></span>
+      <button class="btn ghost" data-del="${s.id}">×</button>
+    </div>
+  `).join('');
+  for (const sel of body.querySelectorAll('select[data-key="minSeverity"]')) {
+    sel.addEventListener('change', async () => {
+      await apiPatch(`/api/subscriptions/${sel.dataset.id}`, { minSeverity: sel.value });
+      toast({ kind: 'success', message: 'Subscription updated' });
+    });
+  }
+  for (const cb of body.querySelectorAll('input[type="checkbox"][data-key="enabled"]')) {
+    cb.addEventListener('change', async () => {
+      await apiPatch(`/api/subscriptions/${cb.dataset.id}`, { enabled: cb.checked });
+    });
+  }
+  for (const btn of body.querySelectorAll('[data-del]')) {
+    btn.addEventListener('click', async () => {
+      await apiDelete(`/api/subscriptions/${btn.dataset.del}`);
+      toast({ kind: 'success', message: 'Removed' });
+      await renderSubs(body);
     });
   }
 }
