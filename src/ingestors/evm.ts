@@ -2,6 +2,7 @@ import { ethers } from 'ethers';
 import { Ingestor } from './base.js';
 import { getSetting, SETTINGS } from '../config.js';
 import { bus, EVENTS, type ConfigChangedPayload } from '../utils/event-bus.js';
+import { RpcPool, resolveWsUrls } from '../utils/rpc-pool.js';
 
 const TRANSFER_TOPIC = ethers.id('Transfer(address,address,uint256)');
 
@@ -9,20 +10,20 @@ const iface = new ethers.Interface([
   'event Transfer(address indexed from, address indexed to, uint256 value)',
 ]);
 
-type Cfg = { wsUrl: string; contract: string };
-
-function readCfg(chain: 'eth' | 'bsc'): Cfg {
-  const wsKey = chain === 'eth' ? SETTINGS.chain_eth_ws_url : SETTINGS.chain_bsc_ws_url;
+function readContract(chain: 'eth' | 'bsc'): string {
   const cKey = chain === 'eth' ? SETTINGS.chain_eth_usdt : SETTINGS.chain_bsc_usdt;
-  return {
-    wsUrl: getSetting<string>(wsKey, ''),
-    contract: (getSetting<string>(cKey, '') || '').toLowerCase(),
-  };
+  return (getSetting<string>(cKey, '') || '').toLowerCase();
+}
+
+function buildPool(chain: 'eth' | 'bsc'): RpcPool | null {
+  const urls = resolveWsUrls(chain);
+  return urls.length > 0 ? new RpcPool(urls) : null;
 }
 
 export class EvmIngestor extends Ingestor {
   private provider: ethers.WebSocketProvider | null = null;
-  private cfg: Cfg;
+  private pool: RpcPool | null;
+  private contract: string;
   private readonly configListener = (payload: ConfigChangedPayload) => {
     if (typeof payload.key !== 'string') return;
     if (!payload.key.startsWith(`chain.${this.chain}.`)) return;
@@ -32,7 +33,8 @@ export class EvmIngestor extends Ingestor {
 
   constructor(chain: 'eth' | 'bsc') {
     super(chain);
-    this.cfg = readCfg(chain);
+    this.pool = buildPool(chain);
+    this.contract = readContract(chain);
     bus.on(EVENTS.ConfigChanged, this.configListener);
   }
 
@@ -42,7 +44,8 @@ export class EvmIngestor extends Ingestor {
   }
 
   private async kickReconnect(): Promise<void> {
-    this.cfg = readCfg(this.chain as 'eth' | 'bsc');
+    this.pool = buildPool(this.chain as 'eth' | 'bsc');
+    this.contract = readContract(this.chain as 'eth' | 'bsc');
     if (this.provider) {
       try {
         await this.provider.destroy();
@@ -55,12 +58,13 @@ export class EvmIngestor extends Ingestor {
 
   async connect(): Promise<void> {
     if (this.stopped) return;
-    if (!this.cfg.wsUrl || !this.cfg.contract) {
-      this.log.warn({ cfg: this.cfg }, 'missing ws_url or usdt_contract — skip');
+    if (!this.pool || !this.contract) {
+      this.log.warn({ poolSize: this.pool?.size() ?? 0, contract: this.contract }, 'missing ws urls or usdt_contract — skip');
       throw new Error('missing chain config');
     }
-    this.log.info({ wsUrl: this.cfg.wsUrl, contract: this.cfg.contract }, 'connecting');
-    this.provider = new ethers.WebSocketProvider(this.cfg.wsUrl);
+    const wsUrl = this.pool.current();
+    this.log.info({ wsUrl, contract: this.contract, poolSize: this.pool.size() }, 'connecting');
+    this.provider = new ethers.WebSocketProvider(wsUrl);
 
     // Attach error/close listeners synchronously so the underlying `ws` doesn't bubble
     // an unhandled 'error' event during the handshake (which crashes the process).
@@ -70,50 +74,50 @@ export class EvmIngestor extends Ingestor {
       if (!ws || typeof ws.on !== 'function') return;
       ws.on('error', (err: Error) => {
         wsErrored = err;
-        this.log.warn({ err: err.message }, 'ws error');
+        this.log.warn({ err: err.message, wsUrl }, 'ws error');
         resolve();
       });
       ws.on('close', () => {
-        this.log.warn('ws closed');
+        this.log.warn({ wsUrl }, 'ws closed');
         resolve();
       });
     });
 
-    // Catch-up gap since last checkpoint.
     try {
-      const fromCheckpoint = this.getCheckpoint();
-      const latest = await this.provider.getBlockNumber();
-      if (fromCheckpoint > 0 && latest > fromCheckpoint) {
-        const start = Math.max(fromCheckpoint + 1, latest - 5_000); // cap replay window
-        await this.replayRange(start, latest);
-      }
-      // Cold-start anchor: if there is no checkpoint at all, save `latest - 1` so
-      // future reconnects have a starting point (otherwise this ingestor could sit
-      // forever at checkpoint=0 if no matching Transfer logs arrive before the next
-      // disconnect). We deliberately use `latest - 1` (not `latest`) to avoid claiming
-      // we've already processed `latest` itself — there is a window between this line
-      // and the `provider.on(filter, ...)` attachment below in which new blocks could
-      // arrive; staying one block behind ensures reconnect will replay them.
-      // On warm-start (fromCheckpoint > 0), do NOT touch the checkpoint here:
-      // handleLog() advances it per processed log, which is the correct authoritative source.
-      if (fromCheckpoint === 0) {
-        this.saveCheckpoint(Math.max(0, latest - 1));
-      }
-    } catch (err) {
-      throw wsErrored ?? err;
-    }
-
-    const filter = { address: this.cfg.contract, topics: [TRANSFER_TOPIC] };
-    this.provider.on(filter, async (log) => {
+      // Catch-up gap since last checkpoint.
       try {
-        await this.handleLog(log as ethers.Log);
+        const fromCheckpoint = this.getCheckpoint();
+        const latest = await this.provider.getBlockNumber();
+        if (fromCheckpoint > 0 && latest > fromCheckpoint) {
+          const start = Math.max(fromCheckpoint + 1, latest - 5_000); // cap replay window
+          await this.replayRange(start, latest);
+        }
+        // Cold-start anchor: see fix(v2/M8) — anchor at latest-1 so future
+        // reconnects always have a starting point even if no Transfer logs
+        // arrive before the next disconnect.
+        if (fromCheckpoint === 0) {
+          this.saveCheckpoint(Math.max(0, latest - 1));
+        }
       } catch (err) {
-        this.log.warn({ err: (err as Error).message }, 'log handler error');
+        throw wsErrored ?? err;
       }
-    });
 
-    await wsClosed;
-    if (wsErrored) throw wsErrored;
+      const filter = { address: this.contract, topics: [TRANSFER_TOPIC] };
+      this.provider.on(filter, async (log) => {
+        try {
+          await this.handleLog(log as ethers.Log);
+        } catch (err) {
+          this.log.warn({ err: (err as Error).message }, 'log handler error');
+        }
+      });
+
+      await wsClosed;
+      if (wsErrored) throw wsErrored;
+    } finally {
+      // Always advance to the next URL after a cycle — sticky failures cost at
+      // most one retry. With a single-URL pool this is a no-op rotation.
+      this.pool.next();
+    }
   }
 
   async disconnect(): Promise<void> {
@@ -130,7 +134,7 @@ export class EvmIngestor extends Ingestor {
   private async replayRange(fromBlock: number, toBlock: number): Promise<void> {
     if (!this.provider) return;
     const logs = await this.provider.getLogs({
-      address: this.cfg.contract,
+      address: this.contract,
       topics: [TRANSFER_TOPIC],
       fromBlock,
       toBlock,
