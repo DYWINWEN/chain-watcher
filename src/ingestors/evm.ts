@@ -87,10 +87,18 @@ export class EvmIngestor extends Ingestor {
         const start = Math.max(fromCheckpoint + 1, latest - 5_000); // cap replay window
         await this.replayRange(start, latest);
       }
-      // NOTE: do NOT saveCheckpoint(latest) here — there is a window between
-      // this line and the `provider.on(filter, ...)` attachment below in which
-      // new blocks could arrive and be dropped. handleLog() advances the
-      // checkpoint per processed log, which is the correct authoritative source.
+      // Cold-start anchor: if there is no checkpoint at all, save `latest - 1` so
+      // future reconnects have a starting point (otherwise this ingestor could sit
+      // forever at checkpoint=0 if no matching Transfer logs arrive before the next
+      // disconnect). We deliberately use `latest - 1` (not `latest`) to avoid claiming
+      // we've already processed `latest` itself — there is a window between this line
+      // and the `provider.on(filter, ...)` attachment below in which new blocks could
+      // arrive; staying one block behind ensures reconnect will replay them.
+      // On warm-start (fromCheckpoint > 0), do NOT touch the checkpoint here:
+      // handleLog() advances it per processed log, which is the correct authoritative source.
+      if (fromCheckpoint === 0) {
+        this.saveCheckpoint(Math.max(0, latest - 1));
+      }
     } catch (err) {
       throw wsErrored ?? err;
     }
