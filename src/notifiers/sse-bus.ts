@@ -1,5 +1,12 @@
 import type { Response } from 'express';
-import { bus, EVENTS, type AlertNewPayload, type ConfigChangedPayload } from '../utils/event-bus.js';
+import {
+  bus,
+  EVENTS,
+  type AlertNewPayload,
+  type AlertConfirmedPayload,
+  type AlertDroppedPayload,
+  type ConfigChangedPayload,
+} from '../utils/event-bus.js';
 
 const clients = new Set<Response>();
 
@@ -19,6 +26,8 @@ function ensureBusWired(): void {
   if (wired) return;
   wired = true;
   bus.on(EVENTS.AlertNew, (p: AlertNewPayload) => broadcast('alert', p));
+  bus.on(EVENTS.AlertConfirmed, (p: AlertConfirmedPayload) => broadcast('alert:confirmed', p));
+  bus.on(EVENTS.AlertDropped, (p: AlertDroppedPayload) => broadcast('alert:dropped', p));
   bus.on(EVENTS.ConfigChanged, (p: ConfigChangedPayload) => broadcast('config', p));
 }
 
