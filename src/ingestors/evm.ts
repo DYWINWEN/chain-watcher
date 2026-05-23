@@ -10,12 +10,15 @@ const iface = new ethers.Interface([
   'event Transfer(address indexed from, address indexed to, uint256 value)',
 ]);
 
-function readContract(chain: 'eth' | 'bsc'): string {
-  const cKey = chain === 'eth' ? SETTINGS.chain_eth_usdt : SETTINGS.chain_bsc_usdt;
+function readContract(chain: 'eth' | 'bsc' | 'polygon'): string {
+  const cKey =
+    chain === 'eth' ? SETTINGS.chain_eth_usdt
+    : chain === 'bsc' ? SETTINGS.chain_bsc_usdt
+    : SETTINGS.chain_polygon_usdt;
   return (getSetting<string>(cKey, '') || '').toLowerCase();
 }
 
-function buildPool(chain: 'eth' | 'bsc'): RpcPool | null {
+function buildPool(chain: 'eth' | 'bsc' | 'polygon'): RpcPool | null {
   const urls = resolveWsUrls(chain);
   return urls.length > 0 ? new RpcPool(urls) : null;
 }
@@ -31,7 +34,7 @@ export class EvmIngestor extends Ingestor {
     void this.kickReconnect();
   };
 
-  constructor(chain: 'eth' | 'bsc') {
+  constructor(chain: 'eth' | 'bsc' | 'polygon') {
     super(chain);
     this.pool = buildPool(chain);
     this.contract = readContract(chain);
@@ -44,8 +47,8 @@ export class EvmIngestor extends Ingestor {
   }
 
   private async kickReconnect(): Promise<void> {
-    this.pool = buildPool(this.chain as 'eth' | 'bsc');
-    this.contract = readContract(this.chain as 'eth' | 'bsc');
+    this.pool = buildPool(this.chain as 'eth' | 'bsc' | 'polygon');
+    this.contract = readContract(this.chain as 'eth' | 'bsc' | 'polygon');
     if (this.provider) {
       try {
         await this.provider.destroy();
@@ -149,7 +152,7 @@ export class EvmIngestor extends Ingestor {
     const block = await this.provider!.getBlock(log.blockNumber);
     await this.enqueue({
       kind: 'evm-transfer',
-      chain: this.chain as 'eth' | 'bsc',
+      chain: this.chain as 'eth' | 'bsc' | 'polygon',
       txHash: log.transactionHash,
       logIndex: log.index,
       blockNumber: log.blockNumber,

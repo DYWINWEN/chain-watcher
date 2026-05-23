@@ -6,10 +6,14 @@ import { EthIngestor } from './eth.js';
 import { BscIngestor } from './bsc.js';
 import { BtcIngestor } from './btc.js';
 import { EvmMempoolIngestor } from './mempool.js';
+import { EvmIngestor } from './evm.js';
+import { TronIngestor } from './tron.js';
 
 const active = new Map<string, Ingestor>();
 
 let mempoolEth: EvmMempoolIngestor | null = null;
+let polygon: EvmIngestor | null = null;
+let tron: TronIngestor | null = null;
 
 function shouldRun(chain: 'eth' | 'bsc' | 'btc'): boolean {
   const key =
@@ -60,6 +64,11 @@ export async function startIngestors(): Promise<void> {
   // M15: ETH mempool ingestor (gated by mempool.enabled; connect() throws when disabled)
   mempoolEth = new EvmMempoolIngestor('eth');
   void mempoolEth.start();
+  // M16: Polygon (EVM) + Tron (HTTP poll) — both gated by enabled flag inside connect()
+  polygon = new EvmIngestor('polygon');
+  void polygon.start();
+  tron = new TronIngestor();
+  void tron.start();
 }
 
 export async function stopIngestors(): Promise<void> {
@@ -68,5 +77,13 @@ export async function stopIngestors(): Promise<void> {
   if (mempoolEth) {
     await mempoolEth.stop();
     mempoolEth = null;
+  }
+  if (polygon) {
+    await polygon.stop();
+    polygon = null;
+  }
+  if (tron) {
+    await tron.stop();
+    tron = null;
   }
 }
