@@ -29,6 +29,10 @@ export function scheduleBackfill(chain: Chain, address: string, direction: Direc
 }
 
 async function runBackfill(chain: Chain, address: string, direction: Direction): Promise<void> {
+  if ((chain === 'eth' || chain === 'bsc') && !ethers.isAddress(address)) {
+    logger.warn({ chain, address }, 'backfill: skipping non-EVM address');
+    return;
+  }
   const N = getSetting<number>(SETTINGS.backfill_history_window, 5);
   let replayed: NormalizedTx[] = [];
   if (chain === 'eth' || chain === 'bsc') {
@@ -74,6 +78,12 @@ async function backfillEvm(
     });
   }
   try {
+    // Defense-in-depth: the outer runBackfill guard should have caught this first;
+    // this stays here in case backfillEvm is ever called directly in a future refactor.
+    if (!ethers.isAddress(address)) {
+      logger.warn({ chain, address }, 'backfill: skipping non-EVM address');
+      return [];
+    }
     const latest = await provider.getBlockNumber();
     const lookback = 60_000; // ~ a week on ETH; bounded so eth_getLogs doesn't blow up.
     const fromBlock = Math.max(0, latest - lookback);
