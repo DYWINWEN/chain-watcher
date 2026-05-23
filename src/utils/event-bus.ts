@@ -20,6 +20,7 @@ export type AlertNewPayload = {
   windowTxHashes: string[];
   amountUsdt: number;
   createdAt: number;
+  severity: 'P1' | 'P2' | 'P3';
   pivotLabels: Array<{ label: string; category: string; riskScore: number }>;
   counterpartyLabels: Array<{ label: string; category: string; riskScore: number }>;
 };
