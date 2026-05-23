@@ -5,8 +5,11 @@ import type { Ingestor } from './base.js';
 import { EthIngestor } from './eth.js';
 import { BscIngestor } from './bsc.js';
 import { BtcIngestor } from './btc.js';
+import { EvmMempoolIngestor } from './mempool.js';
 
 const active = new Map<string, Ingestor>();
+
+let mempoolEth: EvmMempoolIngestor | null = null;
 
 function shouldRun(chain: 'eth' | 'bsc' | 'btc'): boolean {
   const key =
@@ -54,9 +57,16 @@ export async function startIngestors(): Promise<void> {
   startOne('eth');
   startOne('bsc');
   startOne('btc');
+  // M15: ETH mempool ingestor (gated by mempool.enabled; connect() throws when disabled)
+  mempoolEth = new EvmMempoolIngestor('eth');
+  void mempoolEth.start();
 }
 
 export async function stopIngestors(): Promise<void> {
   bus.off(EVENTS.ConfigChanged, configListener);
   await Promise.allSettled([...active.keys()].map((c) => stopOne(c as 'eth' | 'bsc' | 'btc')));
+  if (mempoolEth) {
+    await mempoolEth.stop();
+    mempoolEth = null;
+  }
 }
